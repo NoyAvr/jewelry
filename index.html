@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jewelry Workshop</title>
+<!--
+  ==========================================================================
+   3D JEWELRY WORKSHOP — Stage 1 (Raw Stock) & Stage 2 (Sizing / Mandrel)
+  ==========================================================================
+   Single self-contained file. Dependencies are loaded from CDN through an
+   import map: three.js (core + OrbitControls + Sky) and lil-gui.
+
+   Units: 1 scene unit = 1 cm. Ring stock is ~2 mm thick, so the camera
+   near plane and shadow bias are tuned for small-scale work.
+
+   Architecture overview (see sections in the <script> below):
+     1. CONFIG          – constants: resolution, metals, ring-size math
+     2. STATE           – single mutable app state + CURRENT_STAGE
+     3. UTILITIES       – easing, tweens, seeded noise
+     4. RENDERER/SCENE  – renderer, camera, constrained OrbitControls
+     5. ENVIRONMENT     – procedural outdoor sky → PMREM env map + sun
+     6. WORKSHOP PROPS  – bench, steel bench block, tapered ring mandrel
+     7. SURFACE MAPS    – paintable canvas bump / roughness maps
+     8. RING BLANK      – deformable stock mesh (straight bar → ring)
+     9. STAGES          – stage machine: enter / exit / canAdvance
+    10. UI              – HTML overlay + lil-gui panels
+    11. LOOP            – per-frame update & render
+  ==========================================================================
+-->
+<style>
+  :root {
+    --panel-bg: rgba(22, 20, 18, 0.78);
+    --panel-border: rgba(255, 236, 200, 0.14);
+    --text: #f3ede3;
+    --muted: #b9ae9c;
+    --accent: #e7c27d;
+    --accent-ink: #2a2116;
+    --ok: #9fd39a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #1b1917; color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  /* ---------- Stage overlay ---------- */
+  #overlay {
+    position: fixed; top: 16px; left: 16px; width: min(380px, calc(100vw - 32px));
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 14px; padding: 16px 18px 14px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    user-select: none;
+  }
+  #overlay .brand {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px; }
+  .step {
+    font-size: 10.5px; line-height: 1.25; color: var(--muted);
+    border-top: 3px solid rgba(255,255,255,0.12); padding-top: 6px;
+  }
+  .step b { display: block; font-size: 11px; color: inherit; font-weight: 600; }
+  .step.done { color: var(--ok); border-top-color: var(--ok); }
+  .step.active { color: var(--accent); border-top-color: var(--accent); }
+  #stage-title { margin: 0 0 6px; font-size: 19px; font-weight: 650; letter-spacing: 0.01em; }
+  #stage-desc { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #ddd3c3; }
+  #readout {
+    display: grid; grid-template-columns: auto 1fr; gap: 3px 12px;
+    font-size: 12px; margin: 0 0 12px; padding: 10px 12px;
+    background: rgba(0,0,0,0.25); border-radius: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  #readout dt { color: var(--muted); }
+  #readout dd { margin: 0; text-align: right; }
+  #hint { font-size: 12px; color: var(--accent); min-height: 1.3em; margin: 0 0 10px; }
+  .nav { display: flex; gap: 8px; }
+  .nav button {
+    flex: 1; padding: 10px 12px; border-radius: 9px; font: inherit; font-size: 13px;
+    font-weight: 600; cursor: pointer; border: 1px solid var(--panel-border);
+    background: rgba(255,255,255,0.06); color: var(--text); transition: background 0.15s, opacity 0.15s;
+  }
+  .nav button:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+  .nav button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .nav button.primary:hover:not(:disabled) { background: #f1d196; }
+  .nav button:disabled { opacity: 0.38; cursor: not-allowed; }
+  #controls-hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.35);
+    padding: 6px 12px; border-radius: 20px; pointer-events: none; white-space: nowrap;
+  }
+  #loading {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: #1b1917; color: var(--muted); font-size: 14px; letter-spacing: 0.08em;
+    transition: opacity 0.6s; z-index: 10;
+  }
+  .lil-gui.root { --width: 280px; }
+
+  /* Phone layout: overlay docks to the bottom, GUI stays top-right & collapsible. */
+  @media (max-width: 720px) {
+    #overlay { top: auto; bottom: 12px; left: 12px; width: calc(100vw - 24px); padding: 12px 14px; }
+    #stage-desc { font-size: 12px; max-height: 5.5em; overflow: auto; }
+    #readout { grid-template-columns: auto 1fr auto 1fr; font-size: 11px; }
+    #controls-hint { display: none; }
+    .lil-gui.root { --width: 230px; }
+  }
+</style>
+
+<!-- Import map: bare specifiers resolved to CDN ES modules. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">PREPARING THE BENCH…</div>
+
+<!-- ======================= Stage overlay (HTML) ======================= -->
+<div id="overlay">
+  <div class="brand">Atelier · 3D Jewelry Workshop</div>
+  <div class="stepper" id="stepper"></div>
+  <h1 id="stage-title"></h1>
+  <p id="stage-desc"></p>
+  <dl id="readout"></dl>
+  <p id="hint"></p>
+  <div class="nav">
+    <button id="btn-prev">← Previous Stage</button>
+    <button id="btn-next" class="primary">Next Stage →</button>
+  </div>
+</div>
+<div id="controls-hint">Drag to orbit · Right-drag to pan · Scroll to zoom</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import GUI from 'lil-gui';
+
+/* ==========================================================================
+   1. CONFIG
+   ========================================================================== */
+
+/** Mesh resolution of the ring stock. Kept high so later stages (carving,
+ *  engraving displacement, heat colouring) have enough vertices to work on. */
+const RING_RESOLUTION = {
+  tubularSegments: 128, // along the length of the bar (→ around the finished ring)
+  radialSegments: 64,   // around the cross-section profile
+};
+
+/** Surface map resolution. u runs along the bar length, v around the profile. */
+const SURFACE_MAP_SIZE = { width: 2048, height: 512 };
+
+/** Table top is at y = 0. All prop placement is relative to this. */
+const TABLE_TOP_Y = 0;
+const MANDREL = {
+  axisY: 4.2,        // height of the mandrel's centre line above the bench
+  minSize: 1,        // US size engraved at the thin end
+  maxSize: 15,       // US size engraved at the thick end
+  xMin: -10,         // x-position of the size-1 graduation
+  xMax: 10,          // x-position of the size-15 graduation
+  overhang: 1,       // extra steel beyond the first / last graduation
+};
+const BENCH_BLOCK = { x: 1.5, z: 8.5, size: [9, 1.2, 5.5] }; // steel bench block
+const STOCK_TRAY = { x: -10, z: 8.5 };
+
+/**
+ * Standard US/Canada ring size → inner diameter in millimetres.
+ * d(mm) = 11.63 + 0.8128 × size   (size 5 ≈ 15.7 mm, size 12 ≈ 21.4 mm)
+ */
+const usSizeToInnerDiameterMM = (size) => 11.63 + 0.8128 * size;
+
+/** Mandrel position (x) of a graduation, linear because diameter is linear in size. */
+const mandrelXForSize = (size) =>
+  THREE.MathUtils.mapLinear(size, MANDREL.minSize, MANDREL.maxSize, MANDREL.xMin, MANDREL.xMax);
+const mandrelRadiusAtX = (x) => {
+  const size = THREE.MathUtils.mapLinear(x, MANDREL.xMin, MANDREL.xMax, MANDREL.minSize, MANDREL.maxSize);
+  return usSizeToInnerDiameterMM(size) / 20; // mm diameter → cm radius
+};
+
+/**
+ * Metal presets for MeshPhysicalMaterial. Colours are linear-space F0
+ * reflectance values of the alloys. Raw stock is deliberately unpolished:
+ * roughness 0.5 / metalness 0.9 (a little diffuse from oxide & drawing lube).
+ * density in g/cm³ drives the live weight estimate.
+ */
+const METAL_PRESETS = {
+  'Raw 18K Gold': {
+    color: [1.0, 0.72, 0.29], density: 15.5, roughness: 0.5, metalness: 0.9,
+    hallmark: '750', tag: '18K',
+  },
+  'Sterling Silver': {
+    color: [0.962, 0.949, 0.922], density: 10.36, roughness: 0.5, metalness: 0.9,
+    hallmark: '925', tag: '925',
+  },
+  'Rose Gold': {
+    color: [0.955, 0.638, 0.538], density: 15.2, roughness: 0.5, metalness: 0.9,
+    hallmark: '750', tag: 'ROSE',
+  },
+};
+
+/** Cross-section profiles of the drawn stock. */
+const PROFILES = ['D-Shape (Half Round)', 'Flat / Rectangular', 'Round Wire'];
+
+/* ==========================================================================
+   2. STATE
+   ========================================================================== */
+
+/** @typedef {'RAW_MATERIAL' | 'SIZING' | 'ENGRAVING' | 'FINISHING'} StageId */
+const STAGE_ORDER = /** @type {StageId[]} */ (['RAW_MATERIAL', 'SIZING', 'ENGRAVING', 'FINISHING']);
+
+/** @type {StageId} */
+let CURRENT_STAGE = 'RAW_MATERIAL';
+
+/** All mutable app data lives here so later stages can read / serialise it. */
+const state = {
+  metal: 'Raw 18K Gold',
+  profile: PROFILES[0],
+  widthMM: 4.0,        // band width
+  thicknessMM: 1.8,    // band thickness (radial)
+  ringSize: 7,         // US size
+  bend: 0,             // 0 = straight bar, 1 = closed ring
+  onMandrel: 0,        // 0 = lying on bench block, 1 = seated on mandrel (animated)
+  busy: false,         // true while a stage transition animation runs
+  sun: { elevation: 38, azimuth: 205 },
+  exposure: 0.72,
+  wireframe: false,
+};
+
+/* ==========================================================================
+   3. UTILITIES — easing, promise tweens, seeded random & value noise
+   ========================================================================== */
+
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+/** Minimal keyed tween system: starting a tween with an existing key cancels the old one. */
+const tweens = new Map();
+function tween(key, { duration = 1000, ease = easeInOutCubic, onUpdate }) {
+  const prev = tweens.get(key);
+  if (prev) prev.resolve(false); // cancelled
+  return new Promise((resolve) => {
+    tweens.set(key, { start: performance.now(), duration, ease, onUpdate, resolve });
+  });
+}
+function updateTweens(now) {
+  for (const [key, tw] of tweens) {
+    const t = Math.min(1, (now - tw.start) / tw.duration);
+    tw.onUpdate(tw.ease(t));
+    if (t >= 1) { tweens.delete(key); tw.resolve(true); }
+  }
+}
+/** Tween a numeric property of `state`. Resolves when finished. */
+function tweenState(prop, to, duration) {
+  const from = state[prop];
+  if (Math.abs(from - to) < 1e-6) return Promise.resolve(true);
+  return tween(prop, { duration, onUpdate: (k) => { state[prop] = from + (to - from) * k; onStateChanged(prop); } });
+}
+
+/** Deterministic PRNG so the raw-stock surface is reproducible per seed. */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** 2D value noise with smooth interpolation + fractal sum (used for wood grain). */
+function makeValueNoise(seed = 1) {
+  const rnd = mulberry32(seed);
+  const perm = new Uint8Array(512); const vals = new Float32Array(256);
+  for (let i = 0; i < 256; i++) { perm[i] = i; vals[i] = rnd(); }
+  for (let i = 255; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [perm[i], perm[j]] = [perm[j], perm[i]]; }
+  for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
+  const lat = (x, y) => vals[perm[(perm[x & 255] + y) & 511]];
+  const noise = (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y); const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = lat(xi, yi), b = lat(xi + 1, yi), c = lat(xi, yi + 1), d = lat(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+  return (x, y, octaves = 4) => {
+    let sum = 0, amp = 0.5, f = 1, norm = 0;
+    for (let o = 0; o < octaves; o++) { sum += amp * noise(x * f, y * f); norm += amp; amp *= 0.5; f *= 2.03; }
+    return sum / norm;
+  };
+}
+
+/* ==========================================================================
+   4. RENDERER / SCENE / CAMERA / CONTROLS
+   ========================================================================== */
+
+const container = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = state.exposure;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // soft shadow edges
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// Small near plane: we inspect millimetre-scale detail up close.
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.05, 2000);
+camera.position.set(5, 10, 21);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(-2.5, 0.8, 8);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2.5;
+controls.maxDistance = 60;
+// Constrain orbit so the camera can never dip below the bench surface.
+controls.maxPolarAngle = THREE.MathUtils.degToRad(84);
+const MIN_TARGET_Y = TABLE_TOP_Y + 0.3;
+const MIN_CAMERA_Y = TABLE_TOP_Y + 0.6;
+controls.addEventListener('change', () => {
+  // Panning can move the target (and with it the camera) below the table: clamp both.
+  if (controls.target.y < MIN_TARGET_Y) {
+    const dy = MIN_TARGET_Y - controls.target.y;
+    controls.target.y += dy; camera.position.y += dy;
+  }
+  if (camera.position.y < MIN_CAMERA_Y) camera.position.y = MIN_CAMERA_Y;
+});
+controls.update();
+
+/** Smoothly fly the camera + orbit target to a new framing. */
+function flyCamera(position, target, duration = 1400) {
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  const p1 = new THREE.Vector3(...position), t1 = new THREE.Vector3(...target);
+  return tween('camera', {
+    duration,
+    onUpdate: (k) => { camera.position.lerpVectors(p0, p1, k); controls.target.lerpVectors(t0, t1, k); },
+  });
+}
+
+/* ==========================================================================
+   5. ENVIRONMENT — outdoor studio lighting
+   A procedural outdoor scene (physical sky, ground, tree line and white
+   diffusion scrims) is baked into a PMREM environment map. Jewellery is
+   almost entirely lit by its reflections, so this matters more than lights.
+   A shadow-casting directional "sun" is aligned with the sky's sun disc.
+   ========================================================================== */
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+const sky = new Sky();
+sky.scale.setScalar(450);
+sky.renderOrder = -1;
+sky.material.uniforms.turbidity.value = 3.5;
+sky.material.uniforms.rayleigh.value = 1.2;
+sky.material.uniforms.mieCoefficient.value = 0.004;
+sky.material.uniforms.mieDirectionalG.value = 0.82;
+envScene.add(sky);
+
+(function buildEnvDressing() {
+  // Ground: warm stone courtyard / lawn mix seen in reflections below the horizon.
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(200, 64),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.09, 0.085, 0.06) }),
+  );
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -3;
+  envScene.add(ground);
+  // Tree line / buildings on the horizon: dark silhouettes give metals contrast.
+  const rnd = mulberry32(7);
+  const treeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.02, 0.035, 0.02) });
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2 + rnd() * 0.1;
+    const h = 8 + rnd() * 18, w = 6 + rnd() * 14;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), treeMat);
+    m.position.set(Math.cos(a) * 120, h / 2 - 3, Math.sin(a) * 120);
+    m.lookAt(0, m.position.y, 0);
+    envScene.add(m);
+  }
+  // Overhead diffusion scrim + side bounce card (classic outdoor product setup).
+  const scrimMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.74, 0.7), side: THREE.DoubleSide });
+  const scrim = new THREE.Mesh(new THREE.PlaneGeometry(40, 25), scrimMat);
+  scrim.position.set(0, 30, 0); scrim.rotation.x = Math.PI / 2;
+  envScene.add(scrim);
+  const card = new THREE.Mesh(new THREE.PlaneGeometry(18, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.58, 0.55), side: THREE.DoubleSide }));
+  card.position.set(-26, 6, 10); card.lookAt(0, 4, 0);
+  envScene.add(card);
+})();
+
+const hemiLight = new THREE.HemisphereLight(0xdfe9ff, 0x5a4a38, 0.35);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff1dc, 3.2);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+const sc = sunLight.shadow.camera;
+sc.left = -22; sc.right = 22; sc.top = 22; sc.bottom = -22; sc.near = 1; sc.far = 120;
+sunLight.shadow.bias = -0.0004;
+sunLight.shadow.normalBias = 0.02;
+sunLight.target.position.set(0, 0, 3);
+scene.add(sunLight, sunLight.target);
+
+let envRT = null;
+const sunDir = new THREE.Vector3();
+/** Rebuild sky + env map + sun light from state.sun (called on GUI change). */
+function rebuildEnvironment() {
+  const phi = THREE.MathUtils.degToRad(90 - state.sun.elevation);
+  const theta = THREE.MathUtils.degToRad(state.sun.azimuth);
+  sunDir.setFromSphericalCoords(1, phi, theta);
+  sky.material.uniforms.sunPosition.value.copy(sunDir);
+
+  if (envRT) envRT.dispose();
+  envRT = pmrem.fromScene(envScene, 0, 0.1, 1000);
+  scene.environment = envRT.texture;
+  scene.background = envRT.texture;
+  scene.backgroundBlurriness = 0.22; // shallow depth-of-field feel for the garden
+  scene.backgroundIntensity = 0.85;
+
+  sunLight.position.copy(sunLight.target.position).addScaledVector(sunDir, 60);
+  // Warmer, weaker sun near the horizon.
+  const low = 1 - THREE.MathUtils.clamp(state.sun.elevation / 60, 0, 1);
+  sunLight.color.setRGB(1, 0.95 - 0.2 * low, 0.88 - 0.35 * low);
+  sunLight.intensity = 2.0 * (0.45 + 0.55 * (1 - low));
+}
+
+/* ==========================================================================
+   6. WORKSHOP PROPS — bench, steel block, stock tray, tapered ring mandrel
+   ========================================================================== */
+
+/** Procedural oak-like bench top (grain runs along x). */
+function makeWoodTexture(w = 1024, h = 512) {
+  const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d'); const img = ctx.createImageData(w, h);
+  const fbm = makeValueNoise(3);
+  const dark = [92, 60, 36], light = [168, 122, 78];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const n = fbm(x * 0.006, y * 0.04, 4);
+      const grain = 0.5 + 0.5 * Math.sin(y * 0.09 + n * 9.0);
+      const fine = fbm(x * 0.05, y * 0.6, 2);
+      const k = THREE.MathUtils.clamp(grain * 0.75 + fine * 0.35, 0, 1);
+      const i = (y * w + x) * 4;
+      img.data[i] = dark[0] + (light[0] - dark[0]) * k;
+      img.data[i + 1] = dark[1] + (light[1] - dark[1]) * k;
+      img.data[i + 2] = dark[2] + (light[2] - dark[2]) * k;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+/** Steel mandrel with engraved size graduations (canvas texture along its length). */
+function makeMandrelTexture(lengthCm, xStart) {
+  const W = 512, H = 4096;
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  // Subtle lathe-turned rings along the length.
+  const rnd = mulberry32(11);
+  for (let y = 0; y < H; y += 2) {
+    ctx.fillStyle = `rgba(0,0,0,${0.02 + rnd() * 0.05})`; ctx.fillRect(0, y, W, 1);
+  }
+  // Canvas row for a given x on the mandrel (texture flipY: top row = uv.y 1 = +x end).
+  const rowForX = (x) => (1 - (x - xStart) / lengthCm) * H;
+  ctx.fillStyle = '#2b2d30'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 30px "Helvetica Neue", Arial, sans-serif';
+  for (let s = MANDREL.minSize; s <= MANDREL.maxSize; s += 0.5) {
+    const y = rowForX(mandrelXForSize(s));
+    const whole = Number.isInteger(s);
+    if (whole) ctx.fillRect(0, y - 2, W, 4);                 // full graduation ring
+    else for (const u of [0, 0.5]) ctx.fillRect(u * W, y - 1, W * 0.18, 2); // half-size tick
+    if (whole) for (const u of [0.09, 0.59]) ctx.fillText(String(s), u * W, y - 38);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+const props = {};
+(function buildWorkshop() {
+  // --- Bench (thick hardwood top + legs) --------------------------------------
+  const woodTex = makeWoodTexture();
+  woodTex.repeat.set(2, 2);
+  const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.62, metalness: 0, envMapIntensity: 0.6 });
+  const top = new THREE.Mesh(new THREE.BoxGeometry(64, 3, 40), woodMat);
+  top.position.set(0, TABLE_TOP_Y - 1.5, 4);
+  top.receiveShadow = true; top.castShadow = true;
+  scene.add(top);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x4a3423, roughness: 0.8 });
+  for (const [x, z] of [[-29, -13], [29, -13], [-29, 21], [29, 21]]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(4, 72, 4), legMat);
+    leg.position.set(x, TABLE_TOP_Y - 39, z); leg.castShadow = true; scene.add(leg);
+  }
+  const patio = new THREE.Mesh(new THREE.CircleGeometry(160, 64),
+    new THREE.MeshStandardMaterial({ color: 0x7d7465, roughness: 0.95 }));
+  patio.rotation.x = -Math.PI / 2; patio.position.y = TABLE_TOP_Y - 75; patio.receiveShadow = true;
+  scene.add(patio);
+
+  // --- Steel bench block (raw stock rests here in Stage 1) ---------------------
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x70757b, metalness: 1, roughness: 0.6 });
+  const [bw, bh, bd] = BENCH_BLOCK.size;
+  const block = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), steelMat);
+  block.position.set(BENCH_BLOCK.x, TABLE_TOP_Y + bh / 2, BENCH_BLOCK.z);
+  block.castShadow = block.receiveShadow = true;
+  scene.add(block);
+  props.blockTopY = TABLE_TOP_Y + bh;
+
+  // --- Tapered steel ring mandrel ---------------------------------------------
+  const x0 = MANDREL.xMin - MANDREL.overhang, x1 = MANDREL.xMax + MANDREL.overhang;
+  const len = x1 - x0;
+  const mandrelMat = new THREE.MeshStandardMaterial({
+    color: 0xc9cdd2, metalness: 1, roughness: 0.22, map: makeMandrelTexture(len, x0),
+  });
+  // CylinderGeometry is y-up; radiusTop ends up at +x after the -90° z rotation.
+  const mandrelGeo = new THREE.CylinderGeometry(mandrelRadiusAtX(x1), mandrelRadiusAtX(x0), len, 128, 1, false);
+  mandrelGeo.rotateZ(-Math.PI / 2);
+  const mandrel = new THREE.Mesh(mandrelGeo, mandrelMat);
+  mandrel.position.set((x0 + x1) / 2, MANDREL.axisY, 0);
+  mandrel.castShadow = mandrel.receiveShadow = true;
+  scene.add(mandrel);
+  props.mandrel = mandrel;
+
+  // Turned hardwood handle on the thick end.
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0x6b4428, roughness: 0.45 });
+  const handleGeo = new THREE.LatheGeometry(
+    [[0, 0], [1.25, 0], [1.4, 0.8], [1.5, 3.5], [1.42, 6], [1.1, 6.6], [0, 6.7]].map(([r, y]) => new THREE.Vector2(r, y)), 64);
+  handleGeo.rotateZ(-Math.PI / 2);
+  const handle = new THREE.Mesh(handleGeo, handleMat);
+  handle.position.set(x1, MANDREL.axisY, 0);
+  handle.castShadow = true; scene.add(handle);
+
+  // Two hardwood V-block rests holding the mandrel.
+  for (const x of [x0 + 1.2, x1 + 3.5]) {
+    const r = x > x1 ? 1.3 : mandrelRadiusAtX(x);
+    const h = MANDREL.axisY - r * 0.9 - TABLE_TOP_Y;
+    const rest = new THREE.Mesh(new THREE.BoxGeometry(1.6, h, 4), handleMat);
+    rest.position.set(x, TABLE_TOP_Y + h / 2, 0); rest.castShadow = rest.receiveShadow = true;
+    scene.add(rest);
+  }
+
+  // --- Stock tray with one bar of each alloy (clickable in Stage 1) ------------
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x2c2a28, roughness: 0.9 }));
+  tray.position.set(STOCK_TRAY.x, TABLE_TOP_Y + 0.25, STOCK_TRAY.z); tray.receiveShadow = true;
+  scene.add(tray);
+  props.stockBars = [];
+  Object.keys(METAL_PRESETS).forEach((name, i) => {
+    const mat = new THREE.MeshPhysicalMaterial();
+    applyMetalPreset(mat, name);
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 7, 48), mat);
+    bar.rotation.x = Math.PI / 2;
+    bar.position.set(STOCK_TRAY.x - 1.4 + i * 1.4, TABLE_TOP_Y + 0.72, STOCK_TRAY.z);
+    bar.castShadow = true; bar.userData.metal = name;
+    scene.add(bar); props.stockBars.push(bar);
+    const label = makeLabelSprite(METAL_PRESETS[name].tag);
+    label.position.set(bar.position.x, TABLE_TOP_Y + 1.5, STOCK_TRAY.z + 4.6);
+    scene.add(label);
+  });
+})();
+
+function makeLabelSprite(text) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 48;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(20,18,16,0.8)'; g.beginPath(); g.roundRect(4, 4, 120, 40, 10); g.fill();
+  g.fillStyle = '#f0e2c4'; g.font = 'bold 24px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 64, 25);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }));
+  s.scale.set(1.3, 0.49, 1);
+  return s;
+}
+
+/* ==========================================================================
+   7. SURFACE MAPS — paintable data textures for upcoming stages
+   Two canvases share the ring's UV layout (u = along bar / around ring,
+   v = around the cross-section):
+     • bump      – mid-grey 128 = neutral. Engraving will paint darker grooves.
+     • roughness – multiplies material.roughness (green channel). Polishing
+                   will paint darker (smoother) values.
+   Canvas 2D painting is GPU-uploaded on demand via texture.needsUpdate.
+   ========================================================================== */
+
+class SurfaceMaps {
+  constructor({ width, height }) {
+    this.width = width; this.height = height;
+    this.bump = this.#makeLayer();
+    this.roughness = this.#makeLayer();
+    this.seed = 1;
+  }
+
+  #makeLayer() {
+    const canvas = document.createElement('canvas');
+    canvas.width = this.width; canvas.height = this.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.NoColorSpace;      // data, not colour
+    texture.wrapS = THREE.RepeatWrapping;         // u wraps around the closed ring
+    texture.wrapT = THREE.RepeatWrapping;         // v wraps around the profile
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return { canvas, ctx, texture };
+  }
+
+  /**
+   * Fill both layers with an authentic "as-drawn" raw stock finish:
+   * fine pitting / oxide speckle plus long draw-plate scratches that run
+   * along the length of the bar.
+   */
+  generateRawFinish(seed = this.seed) {
+    this.seed = seed;
+    const rnd = mulberry32(seed);
+    const { width: W, height: H } = this;
+
+    // Per-pixel speckle (noise) in one pass for both layers.
+    const bumpImg = this.bump.ctx.createImageData(W, H);
+    const roughImg = this.roughness.ctx.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) {
+      const n = rnd();
+      const b = 128 + (n - 0.5) * 34;                  // bump ±17 around neutral
+      const r = 222 + (rnd() - 0.5) * 50;              // roughness factor ≈ 0.77..0.97
+      const o = i * 4;
+      bumpImg.data[o] = bumpImg.data[o + 1] = bumpImg.data[o + 2] = b; bumpImg.data[o + 3] = 255;
+      roughImg.data[o] = roughImg.data[o + 1] = roughImg.data[o + 2] = r; roughImg.data[o + 3] = 255;
+    }
+    this.bump.ctx.putImageData(bumpImg, 0, 0);
+    this.roughness.ctx.putImageData(roughImg, 0, 0);
+
+    // Draw-plate scratches: long horizontal strokes (constant v, along u).
+    for (let k = 0; k < 900; k++) {
+      const y = rnd() * H, x = rnd() * W, len = W * (0.1 + rnd() * 0.6);
+      const lw = 0.6 + rnd() * 1.6, dark = rnd() < 0.6;
+      this.#strokeWrapped(this.bump.ctx, x, y, len, lw, dark ? `rgba(90,90,90,${0.25 + rnd() * 0.4})` : `rgba(175,175,175,${0.2 + rnd() * 0.3})`);
+      this.#strokeWrapped(this.roughness.ctx, x, y, len, lw, `rgba(255,255,255,${0.15 + rnd() * 0.3})`);
+    }
+    // Handling nicks and pits.
+    for (let k = 0; k < 160; k++) {
+      const x = rnd() * W, y = rnd() * H, r = 1 + rnd() * 3.5;
+      this.paint('bump', x / W, y / H, { radius: r / W, value: 40 + rnd() * 50, alpha: 0.7 });
+    }
+    this.bump.texture.needsUpdate = true;
+    this.roughness.texture.needsUpdate = true;
+  }
+
+  #strokeWrapped(ctx, x, y, len, lw, style) {
+    ctx.strokeStyle = style; ctx.lineWidth = lw;
+    for (const off of [0, -this.width]) {           // wrap across the u seam
+      ctx.beginPath(); ctx.moveTo(x + off, y); ctx.lineTo(x + off + len, y); ctx.stroke();
+    }
+  }
+
+  /**
+   * Paint a soft radial dab into a layer at UV coordinates.
+   * Ready for the Engraving (bump) and Finishing (roughness) stages.
+   * @param {'bump'|'roughness'} layerName
+   * @param {number} u  0..1 along the ring
+   * @param {number} v  0..1 around the profile
+   * @param {{radius:number, value:number, alpha?:number, hardness?:number}} brush
+   *        radius in UV-u units, value 0..255 grey level
+   */
+  paint(layerName, u, v, { radius, value, alpha = 1, hardness = 0.5 }) {
+    const layer = this[layerName];
+    const { ctx } = layer; const W = this.width, H = this.height;
+    const r = Math.max(0.5, radius * W);
+    const px = u * W, py = (1 - v) * H;               // canvas y is flipped vs UV v
+    const g = Math.round(value);
+    for (const ox of [-W, 0, W]) {                    // wrap horizontally
+      const cx = px + ox; if (cx + r < 0 || cx - r > W) continue;
+      const grad = ctx.createRadialGradient(cx, py, r * hardness, cx, py, r);
+      grad.addColorStop(0, `rgba(${g},${g},${g},${alpha})`);
+      grad.addColorStop(1, `rgba(${g},${g},${g},0)`);
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, py, r, 0, Math.PI * 2); ctx.fill();
+    }
+    layer.texture.needsUpdate = true;
+  }
+}
+
+const surfaceMaps = new SurfaceMaps(SURFACE_MAP_SIZE);
+surfaceMaps.generateRawFinish(1);
+
+/* ==========================================================================
+   8. RING BLANK — the deformable stock mesh
+   --------------------------------------------------------------------------
+   One BufferGeometry with a fixed vertex layout is reused for every state:
+     body: (T+1) × (R+1) grid, row i = position along the bar,
+           column j = position around the cross-section (seam duplicated
+           for clean UVs). Index = i*(R+1)+j.
+     caps: two triangle fans (end grain of the cut bar), hidden once the
+           ring is closed (drawRange) since the ends then butt together.
+   Because the layout never changes, positions/normals are rewritten in
+   place — no allocation — so bending, sizing, and later displacement
+   (engraving / carving) stay real-time.
+
+   Bending model (neutral-axis wrap):
+     Blank length L = π·(ID + thickness)   ← the bench jeweller's formula;
+     the neutral axis (profile centre) keeps its length while bending.
+     For bend fraction t, total wrap angle θ = 2π·t and the neutral bend
+     radius is Rn = L/θ. A point at arc-length s and profile offset (a,b)
+     maps to angle α = (s − L/2)/Rn around the mandrel axis (x):
+        x = a
+        y = Rf − Rn + (Rn + b)·cos α      (Rf = final neutral radius)
+        z =          (Rn + b)·sin α
+     The middle of the bar stays fixed on top of the mandrel while both
+     ends wrap down around it; at t = 1, Rn = Rf and the ends meet.
+     Normals are rotated analytically (no seam artefacts).
+   ========================================================================== */
+
+class RingBlank {
+  constructor(material, { tubularSegments, radialSegments }) {
+    this.T = tubularSegments; this.R = radialSegments;
+    const T = this.T, R = this.R;
+
+    this.bodyVertexCount = (T + 1) * (R + 1);
+    this.capVertexCount = 2 * (R + 1);                // per cap: R rim verts + 1 centre
+    const vCount = this.bodyVertexCount + this.capVertexCount;
+
+    this.positions = new Float32Array(vCount * 3);
+    this.normals = new Float32Array(vCount * 3);
+    this.uvs = new Float32Array(vCount * 2);
+
+    // Cross-section profile (a = across band width → x, b = radial → y), R+1 samples.
+    this.profA = new Float32Array(R + 1); this.profB = new Float32Array(R + 1);
+    this.profNA = new Float32Array(R + 1); this.profNB = new Float32Array(R + 1);
+    this.profileArea = 0; // cm²
+
+    // Parameters (cm). Set via setters, applied in update().
+    this.width = 0.4; this.thickness = 0.18; this.profileType = PROFILES[0];
+    this.innerRadius = usSizeToInnerDiameterMM(7) / 20;
+    this.bend = 0;
+
+    this.geometry = new THREE.BufferGeometry();
+    this.posAttr = new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage);
+    this.nrmAttr = new THREE.BufferAttribute(this.normals, 3).setUsage(THREE.DynamicDrawUsage);
+    this.uvAttr = new THREE.BufferAttribute(this.uvs, 2);
+    this.geometry.setAttribute('position', this.posAttr);
+    this.geometry.setAttribute('normal', this.nrmAttr);
+    this.geometry.setAttribute('uv', this.uvAttr);
+    this.#buildIndex();
+
+    this.mesh = new THREE.Mesh(this.geometry, material);
+    this.mesh.castShadow = true; this.mesh.receiveShadow = true;
+    this.mesh.name = 'RingBlank';
+
+    /** Snapshot of the formed ring used as the rest state for later stages. */
+    this.base = null;
+    this.profileDirty = true;
+    this.dirty = true;
+  }
+
+  // ---- derived measurements ------------------------------------------------
+  get neutralRadius() { return this.innerRadius + this.thickness / 2; }
+  /** L = π × (inner diameter + thickness) */
+  get blankLength() { return 2 * Math.PI * this.neutralRadius; }
+  get volume() { return this.profileArea * this.blankLength; } // cm³
+  get isClosed() { return this.bend >= 0.9999; }
+
+  // ---- setters (mark dirty; geometry is rebuilt lazily once per frame) -----
+  setProfile(type, widthCm, thicknessCm) {
+    this.profileType = type; this.width = widthCm; this.thickness = thicknessCm;
+    this.profileDirty = this.dirty = true;
+  }
+  setSize(usSize) { this.innerRadius = usSizeToInnerDiameterMM(usSize) / 20; this.dirty = true; }
+  setBend(t) { this.bend = THREE.MathUtils.clamp(t, 0, 1); this.dirty = true; }
+
+  // ---- topology --------------------------------------------------------------
+  #buildIndex() {
+    const T = this.T, R = this.R, stride = R + 1;
+    const bodyTris = T * R * 2, capTris = R * 2;
+    const index = new Uint32Array((bodyTris + capTris) * 3);
+    let k = 0;
+    for (let i = 0; i < T; i++) {
+      for (let j = 0; j < R; j++) {
+        const v00 = i * stride + j, v01 = v00 + 1, v10 = v00 + stride, v11 = v10 + 1;
+        // Winding chosen so (∂P/∂profile × ∂P/∂length) points outward.
+        index[k++] = v00; index[k++] = v01; index[k++] = v10;
+        index[k++] = v01; index[k++] = v11; index[k++] = v10;
+      }
+    }
+    this.bodyIndexCount = k;
+    const c0 = this.bodyVertexCount;           // start cap: rim c0..c0+R-1, centre c0+R
+    const c1 = c0 + R + 1;                     // end cap
+    for (let j = 0; j < R; j++) {
+      const jn = (j + 1) % R;
+      index[k++] = c0 + R; index[k++] = c0 + jn; index[k++] = c0 + j;  // faces −length
+      index[k++] = c1 + R; index[k++] = c1 + j;  index[k++] = c1 + jn; // faces +length
+    }
+    this.geometry.setIndex(new THREE.BufferAttribute(index, 1));
+  }
+
+  // ---- cross-section ---------------------------------------------------------
+  /** Raw profile point for angle φ (counter-clockwise, b>0 is the outside of the ring). */
+  #profilePoint(phi) {
+    const hw = this.width / 2, hh = this.thickness / 2;
+    const se = (c, n) => Math.sign(c) * Math.pow(Math.abs(c), 2 / n); // superellipse term
+    const c = Math.cos(phi), s = Math.sin(phi);
+    switch (this.profileType) {
+      case 'Flat / Rectangular': return [hw * se(c, 7), hh * se(s, 7)];
+      case 'Round Wire':         return [hh * c, hh * s]; // diameter = thickness
+      default: {
+        // D-shape: domed outside (ellipse), nearly flat comfort-fit inside.
+        const n = s >= 0 ? 2.1 : 7;
+        return [hw * se(c, n), hh * se(s, n)];
+      }
+    }
+  }
+
+  /**
+   * Sample the profile densely, then resample at uniform arc length so the
+   * R columns are evenly spaced (uniform texel density for engraving / UVs).
+   */
+  #rebuildProfile() {
+    const R = this.R, N = 2048;
+    const pa = new Float64Array(N + 1), pb = new Float64Array(N + 1), cum = new Float64Array(N + 1);
+    let area = 0;
+    for (let k = 0; k <= N; k++) {
+      const [a, b] = this.#profilePoint((k / N) * Math.PI * 2);
+      pa[k] = a; pb[k] = b;
+      if (k > 0) {
+        cum[k] = cum[k - 1] + Math.hypot(a - pa[k - 1], b - pb[k - 1]);
+        area += pa[k - 1] * b - a * pb[k - 1]; // shoelace
+      }
+    }
+    this.profileArea = Math.abs(area) / 2;
+    const P = cum[N];
+    let seg = 0;
+    for (let j = 0; j <= R; j++) {
+      const target = (j / R) * P;
+      while (seg < N - 1 && cum[seg + 1] < target) seg++;
+      const f = (target - cum[seg]) / Math.max(1e-12, cum[seg + 1] - cum[seg]);
+      this.profA[j] = pa[seg] + (pa[seg + 1] - pa[seg]) * f;
+      this.profB[j] = pb[seg] + (pb[seg + 1] - pb[seg]) * f;
+    }
+    this.profA[R] = this.profA[0]; this.profB[R] = this.profB[0];
+    // Outward normals: rotate the central-difference tangent by −90°.
+    for (let j = 0; j <= R; j++) {
+      const jp = (j + 1) % R, jm = (j - 1 + R) % R;
+      const ta = this.profA[jp] - this.profA[jm], tb = this.profB[jp] - this.profB[jm];
+      const len = Math.hypot(ta, tb) || 1;
+      this.profNA[j] = tb / len; this.profNB[j] = -ta / len;
+    }
+    this.#writeUVs();
+    this.profileDirty = false;
+  }
+
+  /** UVs depend only on the grid, so they are written once per profile. */
+  #writeUVs() {
+    const T = this.T, R = this.R, uv = this.uvs;
+    for (let i = 0; i <= T; i++) for (let j = 0; j <= R; j++) {
+      const o = (i * (R + 1) + j) * 2; uv[o] = i / T; uv[o + 1] = j / R;
+    }
+    const c0 = this.bodyVertexCount;
+    for (let cap = 0; cap < 2; cap++) for (let j = 0; j <= R; j++) {
+      const o = (c0 + cap * (R + 1) + j) * 2; uv[o] = cap; uv[o + 1] = j < R ? j / R : 0.5;
+    }
+    this.uvAttr.needsUpdate = true;
+  }
+
+  // ---- deformation -----------------------------------------------------------
+  /** Recompute positions + normals for the current size / profile / bend. */
+  update() {
+    if (!this.dirty) return;
+    if (this.profileDirty) this.#rebuildProfile();
+
+    const T = this.T, R = this.R, P = this.positions, N = this.normals;
+    const L = this.blankLength, Rf = this.neutralRadius;
+    const theta = this.bend * Math.PI * 2;
+    const straight = theta < 1e-4;
+    const Rn = straight ? Infinity : L / theta;
+
+    // Maps (s, a, b) → position & (na, nb) → normal. Writes into P/N at vertex v.
+    const write = (v, s, a, b, na, nb) => {
+      const o = v * 3;
+      if (straight) {
+        P[o] = a; P[o + 1] = Rf + b; P[o + 2] = s - L / 2;
+        N[o] = na; N[o + 1] = nb; N[o + 2] = 0;
+      } else {
+        const alpha = (s - L / 2) / Rn, ca = Math.cos(alpha), sa = Math.sin(alpha), r = Rn + b;
+        P[o] = a; P[o + 1] = Rf - Rn + r * ca; P[o + 2] = r * sa;
+        N[o] = na; N[o + 1] = nb * ca; N[o + 2] = nb * sa;
+      }
+    };
+
+    for (let i = 0; i <= T; i++) {
+      const s = (i / T) * L;
+      for (let j = 0; j <= R; j++) {
+        write(i * (R + 1) + j, s, this.profA[j], this.profB[j], this.profNA[j], this.profNB[j]);
+      }
+    }
+
+    // End caps: positions from the profile rim; normals = ∓ bar tangent.
+    const c0 = this.bodyVertexCount;
+    for (let cap = 0; cap < 2; cap++) {
+      const s = cap * L, base = c0 + cap * (R + 1);
+      for (let j = 0; j < R; j++) write(base + j, s, this.profA[j], this.profB[j], 0, 0);
+      write(base + R, s, 0, 0, 0, 0);
+      const alpha = straight ? 0 : (s - L / 2) / Rn;
+      const sign = cap === 0 ? -1 : 1;
+      const tx = 0, ty = -Math.sin(alpha) * sign, tz = Math.cos(alpha) * sign;
+      for (let j = 0; j <= R; j++) { const o = (base + j) * 3; N[o] = tx; N[o + 1] = ty; N[o + 2] = tz; }
+    }
+
+    // Once closed, the butt joint hides the end grain: skip the caps.
+    this.geometry.setDrawRange(0, this.isClosed ? this.bodyIndexCount : Infinity);
+    this.posAttr.needsUpdate = true; this.nrmAttr.needsUpdate = true;
+    this.geometry.computeBoundingSphere();
+    this.geometry.computeBoundingBox();
+    this.dirty = false;
+  }
+
+  /**
+   * Freeze the current (formed) shape as the base state for later stages.
+   * Engraving / carving will displace from base.positions along base.normals,
+   * and paint into SurfaceMaps using base.uvs — so edits are always
+   * non-destructive relative to this snapshot.
+   */
+  commitBase() {
+    this.update();
+    this.base = {
+      positions: this.positions.slice(),
+      normals: this.normals.slice(),
+      uvs: this.uvs.slice(),
+      stride: this.R + 1,           // vertices per ring row (index = i*stride + j)
+      rows: this.T + 1,
+      bodyVertexCount: this.bodyVertexCount,
+      innerRadius: this.innerRadius, width: this.width, thickness: this.thickness,
+    };
+    return this.base;
+  }
+  /** Restore positions / normals from the committed base (undo helper). */
+  restoreBase() {
+    if (!this.base) return;
+    this.positions.set(this.base.positions); this.normals.set(this.base.normals);
+    this.posAttr.needsUpdate = this.nrmAttr.needsUpdate = true;
+  }
+}
+
+/* ---------- Ring material + instance ---------- */
+
+function applyMetalPreset(material, name) {
+  const p = METAL_PRESETS[name];
+  material.color.setRGB(p.color[0], p.color[1], p.color[2], THREE.LinearSRGBColorSpace);
+  material.metalness = p.metalness;
+  material.roughness = p.roughness;
+  material.envMapIntensity = 1.0;
+  material.needsUpdate = true;
+}
+
+const ringMaterial = new THREE.MeshPhysicalMaterial({
+  metalness: 0.9,
+  roughness: 0.5,
+  roughnessMap: surfaceMaps.roughness.texture, // painted in FINISHING (polishing)
+  bumpMap: surfaceMaps.bump.texture,           // painted in ENGRAVING
+  bumpScale: 0.6,
+  specularIntensity: 1,
+  ior: 2.2,
+});
+applyMetalPreset(ringMaterial, state.metal);
+
+const ring = new RingBlank(ringMaterial, RING_RESOLUTION);
+ring.setProfile(state.profile, state.widthMM / 10, state.thicknessMM / 10);
+ring.setSize(state.ringSize);
+scene.add(ring.mesh);
+
+/* ---------- Placement: bench block ⇄ mandrel ---------- */
+const _benchQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.32);
+const _mandrelQuat = new THREE.Quaternion();
+const _pBench = new THREE.Vector3(), _pMandrel = new THREE.Vector3();
+
+/** x on the mandrel where the band's thick-side edge meets its inner diameter. */
+function ringMandrelX() { return mandrelXForSize(state.ringSize) - ring.width / 2; }
+
+/** Place the stock according to state.onMandrel (0 bench → 1 mandrel) with a lift arc. */
+function updateStockPlacement() {
+  const k = state.onMandrel;
+  // Bench: the straight bar's lowest face (local y = Rf − h/2) sits on the steel block.
+  _pBench.set(BENCH_BLOCK.x, props.blockTopY - (ring.neutralRadius - ring.thickness / 2) + 0.001, BENCH_BLOCK.z);
+  // Mandrel: local origin == mandrel axis, so the ring closes concentrically.
+  _pMandrel.set(ringMandrelX(), MANDREL.axisY, 0);
+  ring.mesh.position.lerpVectors(_pBench, _pMandrel, k);
+  ring.mesh.position.y += Math.sin(Math.PI * k) * 4.5;
+  ring.mesh.quaternion.slerpQuaternions(_benchQuat, _mandrelQuat, k);
+}
+
+/* ==========================================================================
+   9. STAGES — state machine
+   Each stage defines: title, description (authentic bench notes), GUI
+   folder keys to show, enter/exit hooks (may be async animations) and an
+   optional canAdvance() gate with a hint.
+   ========================================================================== */
+
+const STAGES = {
+  RAW_MATERIAL: {
+    title: 'Stage 1 · Raw Stock Selection',
+    description:
+      'Choose your alloy and the drawn profile of the stock. The bar is fresh from the draw plate — ' +
+      'dull, oxidised and scored with lengthwise draw marks. Click a bar in the tray or use the panel.',
+    folders: ['stock'],
+    camera: { position: [5, 10, 21], target: [-2.5, 0.8, 8] },
+    async enter(from) {
+      if (from === 'SIZING') {
+        await tweenState('bend', 0, 900);
+        await tweenState('onMandrel', 0, 1300);
+      }
+    },
+  },
+  SIZING: {
+    title: 'Stage 2 · Sizing & Ring Bending',
+    description:
+      'Set the finger size. The blank is cut to L = π × (ID + thickness) and wrapped around the ' +
+      'steel mandrel at the matching graduation. Form it fully until the ends butt together.',
+    folders: ['sizing'],
+    camera: { position: [11, 10, 13], target: [0, 4, 0] },
+    async enter(from) {
+      if (from === 'RAW_MATERIAL') await tweenState('onMandrel', 1, 1500);
+    },
+    canAdvance: () => ring.isClosed,
+    blockedHint: 'Form the ring fully on the mandrel (bend 100%) to continue.',
+  },
+  ENGRAVING: {
+    title: 'Stage 3 · Engraving',
+    description:
+      'The formed ring is locked as the base mesh: vertex positions, normals and UVs are snapshotted ' +
+      'so gravers and chasing tools can paint into the bump map. (Tools arrive in the next build.)',
+    folders: [],
+    camera: { position: [6, 6.5, 5.5], target: [0, 4.2, 0] },
+    enter() {
+      const base = ring.commitBase();
+      console.info('[Workshop] Base geometry committed:', base);
+    },
+  },
+  FINISHING: {
+    title: 'Stage 4 · Finishing',
+    description:
+      'Filing, sanding and polishing will paint into the roughness map, taking the surface from raw ' +
+      'draw marks to a mirror finish. (Tools arrive in the next build.)',
+    folders: [],
+    camera: { position: [-5, 7, 6], target: [0, 4.2, 0] },
+  },
+};
+
+async function goToStage(next) {
+  if (state.busy || next === CURRENT_STAGE || !STAGES[next]) return;
+  const from = CURRENT_STAGE;
+  state.busy = true;
+  CURRENT_STAGE = next;
+  refreshUI();
+  const stage = STAGES[next];
+  // Frame the stage; for SIZING follow the ring's x on the mandrel.
+  const cam = structuredClone(stage.camera);
+  if (next !== 'RAW_MATERIAL') { cam.target[0] += ringMandrelX(); cam.position[0] += ringMandrelX(); }
+  await Promise.all([flyCamera(cam.position, cam.target, 1500), stage.enter?.(from)]);
+  state.busy = false;
+  refreshUI();
+}
+const stageIndex = () => STAGE_ORDER.indexOf(CURRENT_STAGE);
+const nextStage = () => {
+  const s = STAGES[CURRENT_STAGE];
+  if (s.canAdvance && !s.canAdvance()) return;
+  goToStage(STAGE_ORDER[stageIndex() + 1]);
+};
+const prevStage = () => goToStage(STAGE_ORDER[stageIndex() - 1]);
+
+/** Central reaction to state changes (from GUI, tweens or clicks). */
+function onStateChanged(key) {
+  switch (key) {
+    case 'metal': applyMetalPreset(ringMaterial, state.metal); break;
+    case 'profile': case 'widthMM': case 'thicknessMM':
+      ring.setProfile(state.profile, state.widthMM / 10, state.thicknessMM / 10); break;
+    case 'ringSize': ring.setSize(state.ringSize); break;
+    case 'bend': ring.setBend(state.bend); break;
+  }
+  uiDirty = true;
+}
+
+/* ==========================================================================
+   10. UI — HTML overlay + lil-gui
+   ========================================================================== */
+
+const el = {
+  stepper: document.getElementById('stepper'),
+  title: document.getElementById('stage-title'),
+  desc: document.getElementById('stage-desc'),
+  readout: document.getElementById('readout'),
+  hint: document.getElementById('hint'),
+  prev: document.getElementById('btn-prev'),
+  next: document.getElementById('btn-next'),
+};
+el.stepper.innerHTML = STAGE_ORDER.map((id, i) =>
+  `<div class="step" data-stage="${id}"><b>${i + 1}</b>${id.replace('_', ' ').toLowerCase()}</div>`).join('');
+el.prev.addEventListener('click', prevStage);
+el.next.addEventListener('click', nextStage);
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('.lil-gui')) return;
+  if (e.key === 'ArrowRight') nextStage();
+  if (e.key === 'ArrowLeft') prevStage();
+});
+
+let uiDirty = true;
+function refreshUI() {
+  const idx = stageIndex(); const stage = STAGES[CURRENT_STAGE];
+  el.stepper.querySelectorAll('.step').forEach((node, i) => {
+    node.classList.toggle('active', i === idx); node.classList.toggle('done', i < idx);
+  });
+  el.title.textContent = stage.title;
+  el.desc.textContent = stage.description;
+
+  const idMM = usSizeToInnerDiameterMM(state.ringSize);
+  const grams = ring.volume * METAL_PRESETS[state.metal].density;
+  const rows = [
+    ['Alloy', `${state.metal} (${METAL_PRESETS[state.metal].hallmark})`],
+    ['Profile', `${state.profile.split(' ')[0]} ${state.widthMM.toFixed(1)} × ${state.thicknessMM.toFixed(1)} mm`],
+    ['US size', `${state.ringSize.toFixed(2)} · ID ${idMM.toFixed(2)} mm`],
+    ['Blank length', `${(ring.blankLength * 10).toFixed(1)} mm`],
+    ['Est. weight', `${grams.toFixed(2)} g`],
+    ['Formed', `${Math.round(state.bend * 100)} %${ring.isClosed ? ' · closed' : ''}`],
+  ];
+  if (ring.base) rows.push(['Base mesh', `${ring.base.bodyVertexCount.toLocaleString()} verts`]);
+  el.readout.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+
+  const blocked = stage.canAdvance && !stage.canAdvance();
+  el.hint.textContent = state.busy ? 'Working…' : blocked ? stage.blockedHint : '';
+  el.prev.disabled = state.busy || idx === 0;
+  el.next.disabled = state.busy || idx === STAGE_ORDER.length - 1 || blocked;
+
+  // Stage-scoped GUI folders.
+  for (const [key, folder] of Object.entries(guiFolders)) {
+    folder.show(stage.folders.includes(key));
+  }
+  const editable = !state.busy;
+  for (const c of guiFolders.stock.controllersRecursive()) c.enable(editable);
+  for (const c of guiFolders.sizing.controllersRecursive()) c.enable(editable);
+  uiDirty = false;
+}
+
+/* ---------- lil-gui ---------- */
+const gui = new GUI({ title: 'Workshop Controls' });
+if (window.innerWidth < 720) gui.close();
+const guiFolders = {};
+
+guiFolders.stock = gui.addFolder('Stage 1 · Raw Stock');
+guiFolders.stock.add(state, 'metal', Object.keys(METAL_PRESETS)).name('Alloy').onChange(() => onStateChanged('metal'));
+guiFolders.stock.add(state, 'profile', PROFILES).name('Profile').onChange(() => onStateChanged('profile'));
+guiFolders.stock.add(state, 'widthMM', 2, 8, 0.1).name('Width (mm)').onChange(() => onStateChanged('widthMM'));
+guiFolders.stock.add(state, 'thicknessMM', 1.2, 3, 0.1).name('Thickness (mm)').onChange(() => onStateChanged('thicknessMM'));
+guiFolders.stock.add({ reroll: () => surfaceMaps.generateRawFinish(surfaceMaps.seed + 1) }, 'reroll').name('New raw surface');
+
+guiFolders.sizing = gui.addFolder('Stage 2 · Sizing');
+guiFolders.sizing.add(state, 'ringSize', 5, 12, 0.25).name('US ring size').onChange(() => onStateChanged('ringSize'));
+const bendCtrl = guiFolders.sizing.add(state, 'bend', 0, 1, 0.001).name('Formed').onChange(() => { tweens.delete('bend'); onStateChanged('bend'); });
+const sizingActions = {
+  form: async () => { await tweenState('bend', 1, 2200 * (1 - state.bend) + 200); },
+  straighten: async () => { await tweenState('bend', 0, 1200); },
+};
+guiFolders.sizing.add(sizingActions, 'form').name('▶ Form on mandrel');
+guiFolders.sizing.add(sizingActions, 'straighten').name('↺ Straighten');
+
+const studio = gui.addFolder('Studio Lighting');
+studio.add(state.sun, 'elevation', 5, 85, 1).name('Sun elevation').onFinishChange(rebuildEnvironment);
+studio.add(state.sun, 'azimuth', 0, 360, 1).name('Sun azimuth').onFinishChange(rebuildEnvironment);
+studio.add(state, 'exposure', 0.3, 2, 0.01).name('Exposure').onChange((v) => { renderer.toneMappingExposure = v; });
+studio.add(state, 'wireframe').name('Wireframe (debug)').onChange((v) => { ringMaterial.wireframe = v; });
+studio.close();
+
+/* ---------- Click-to-select stock bars in the tray (Stage 1) ---------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let downAt = null;
+function pickStockBar(ev) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  return raycaster.intersectObjects(props.stockBars, false)[0]?.object ?? null;
+}
+renderer.domElement.addEventListener('pointerdown', (e) => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!downAt || CURRENT_STAGE !== 'RAW_MATERIAL' || state.busy) return;
+  const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]); downAt = null;
+  if (moved > 5) return; // it was an orbit drag
+  const hit = pickStockBar(e);
+  if (hit) { state.metal = hit.userData.metal; onStateChanged('metal'); gui.controllersRecursive().forEach((c) => c.updateDisplay()); }
+});
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (e.buttons || CURRENT_STAGE !== 'RAW_MATERIAL') { renderer.domElement.style.cursor = ''; return; }
+  renderer.domElement.style.cursor = pickStockBar(e) ? 'pointer' : '';
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ==========================================================================
+   11. LOOP
+   ========================================================================== */
+
+rebuildEnvironment();
+ring.update(); // build the profile so the first readout has area / weight
+refreshUI();
+
+function frame(now) {
+  updateTweens(now);
+  ring.update();              // no-op unless size / profile / bend changed
+  updateStockPlacement();
+  controls.update();
+  if (uiDirty) { refreshUI(); bendCtrl.updateDisplay(); }
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(frame);
+
+const loading = document.getElementById('loading');
+loading.style.opacity = '0';
+setTimeout(() => loading.remove(), 700);
+
+// Handle for the upcoming stages & debugging from the console.
+window.workshop = {
+  get CURRENT_STAGE() { return CURRENT_STAGE; },
+  STAGES, state, ring, surfaceMaps, ringMaterial, scene, camera, goToStage,
+  /** Set a state value and propagate it (same path as the GUI). */
+  set(key, value) { state[key] = value; onStateChanged(key); gui.controllersRecursive().forEach((c) => c.updateDisplay()); },
+};
+</script>
+</body>
+</html>
