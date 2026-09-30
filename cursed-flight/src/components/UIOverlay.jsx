@@ -68,9 +68,8 @@ function Modal({ children, tone = 'cream' }) {
 /** Boarding-pass header strip shared by the result cards. */
 function PassHeader({ color, label }) {
   return (
-    <div className={`flex items-center justify-between px-6 py-3 text-cream ${color}`}>
+    <div className={`px-6 py-3 text-cream ${color}`}>
       <span className="font-display text-sm font-semibold tracking-[0.25em] uppercase">{label}</span>
-      <span className="font-display text-sm tracking-widest opacity-80">CF · 001</span>
     </div>
   )
 }
