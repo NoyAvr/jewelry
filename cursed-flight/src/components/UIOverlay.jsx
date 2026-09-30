@@ -94,29 +94,20 @@ function IntroScreen() {
   return (
     <Modal>
       <PassHeader color="bg-turquoise" label="Boarding pass" />
-      <div className="px-7 pt-5 pb-7">
-        <h2 data-stagger className="font-display text-3xl font-bold">
-          The Flight Curse
+      {/* Pre-game instructions in Hebrew (right-to-left) */}
+      <div dir="rtl" lang="he" className="px-7 pt-5 pb-7 text-right font-hebrew">
+        <h2 data-stagger className="text-3xl font-bold">
+          קללת הטיסה
         </h2>
-        <p data-stagger className="mt-3 leading-relaxed text-ink-soft">
-          Every time Mom &amp; Dad try to fly, something cancels the flight — a war, a medical emergency, a strike,
-          once even <em>crabs</em>. Today they are determined.
+        <p data-stagger className="mt-3 text-lg leading-relaxed text-ink-soft">
+          עזרו לאמא ולאבא לטפס במגדל עד למטוס שמחכה למעלה: לחצו על משבצת כדי ללכת אליה, או השתמשו בחיצים.
         </p>
-        <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
-          Guide them up the tower to the plane, and dodge the curses falling from the sky. Watch for the red rings
-          — that's where something is about to land.
+        <p data-stagger className="mt-2 text-lg leading-relaxed text-ink-soft">
+          היזהרו מהקללות שנופלות מהשמיים, כי עיגול אדום מסמן איפה משהו עומד לנחות, אז זוזו ממנו מהר!
         </p>
-        <ul data-stagger className="mt-4 space-y-1.5 text-sm text-ink-soft">
-          <li>
-            <span className="font-bold text-ink">Click / tap</span> a tile to walk there.
-          </li>
-          <li>
-            <span className="font-bold text-ink">Arrow keys, WASD</span> or the on-screen pad to step.
-          </li>
-        </ul>
         <div data-stagger className="mt-6 flex justify-center">
           <PrimaryButton onClick={start} autoFocus>
-            Start the journey
+            יוצאים לדרך!
           </PrimaryButton>
         </div>
       </div>
