@@ -252,7 +252,8 @@ function PauseScreen() {
         <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
           הקללות קפאו באוויר. אפשר להמשיך מאותה נקודה בדיוק.
         </p>
-        <div data-stagger className="mt-6 flex flex-wrap items-center justify-center gap-2">
+        {/* One option per row, main action on top */}
+        <div data-stagger className="mt-6 flex flex-col items-center gap-1">
           <PrimaryButton onClick={resume} autoFocus>
             להמשיך לשחק
           </PrimaryButton>
