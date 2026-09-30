@@ -8,6 +8,7 @@ import {
   PALETTE,
   PARAPETS,
   PLANE_PAD,
+  PLANE_TRANSFORM,
   PLINTH,
   PLINTH_TOP,
   STAIRS,
@@ -37,8 +38,12 @@ function Block({ min, max, color, cast = true, receive = true }) {
   )
 }
 
-const isOnPad = ([x, , z]) =>
-  x > PLANE_PAD.min[0] && x < PLANE_PAD.max[0] && z > PLANE_PAD.min[1] && z < PLANE_PAD.max[1]
+const isOnPad = ([x, y, z]) =>
+  y === PLANE_PAD.top &&
+  x > PLANE_PAD.min[0] &&
+  x < PLANE_PAD.max[0] &&
+  z > PLANE_PAD.min[1] &&
+  z < PLANE_PAD.max[1]
 
 /* ------------------------------------------------------------------------------------------------
  * Structural pieces
@@ -96,8 +101,12 @@ function TileColumn({ pos, floor, support }) {
   )
 }
 
-/** Solid stepped staircase between two tiles (steps are extruded down to the plinth). */
-function Staircase({ low, high, floor }) {
+/**
+ * Stepped staircase between two tiles. Steps are normally extruded down to the plinth;
+ * `support: 'floating'` makes each step a thin slab instead, so the flight doesn't hide
+ * what's underneath it.
+ */
+function Staircase({ low, high, floor, support }) {
   const steps = useMemo(() => {
     const a = NODES[low].pos
     const b = NODES[high].pos
@@ -115,9 +124,10 @@ function Staircase({ low, high, floor }) {
       // Extent along the stair axis is `run`, across it `halfWidth * 2`.
       const ex = dx !== 0 ? run / 2 : halfWidth
       const ez = dz !== 0 ? run / 2 : halfWidth
-      return { min: [cx - ex, PLINTH_TOP, cz - ez], max: [cx + ex, top, cz + ez], top, cx, cz, ex, ez }
+      const bottom = support === 'floating' ? top - 0.6 : PLINTH_TOP
+      return { min: [cx - ex, bottom, cz - ez], max: [cx + ex, top, cz + ez], top, cx, cz, ex, ez }
     })
-  }, [low, high])
+  }, [low, high, support])
 
   const { body, cap } = PALETTE.floors[floor]
   return (
@@ -182,26 +192,31 @@ function Parapet({ node, sides }) {
   return sides.map((s) => <Block key={s} min={boxes[s][0]} max={boxes[s][1]} color={color} />)
 }
 
-/** The runway pad: a slab on slender pillars with dashed runway markings. */
+/** The rooftop runway: a slab on a back wall and pillars, with dashed runway markings. */
 function PlanePad() {
-  const { min, max, top, thickness } = PLANE_PAD
-  const { body, cap } = PALETTE.floors[4]
-  const pillars = [
-    [min[0] + 0.4, min[1] + 0.4],
-    [min[0] + 0.4, max[1] - 0.4],
-    [max[0] - 0.4, max[1] - 0.4],
-    [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2],
-  ]
-  // Runway centreline along the plane's heading (−x/+z diagonal).
-  const cx = (min[0] + max[0]) / 2
-  const cz = (min[1] + max[1]) / 2
+  const { min, max, top, thickness, supports } = PLANE_PAD
+  const { body, cap } = PALETTE.floors[6]
+  // Runway centreline along the plane's heading (−x/+z diagonal), through the plane.
+  const [cx, , cz] = PLANE_TRANSFORM.position
   return (
     <group>
       <Block min={[min[0], top - thickness, min[1]]} max={[max[0], top - 0.12, max[1]]} color={body} />
       <Block min={[min[0] - 0.05, top - 0.12, min[1] - 0.05]} max={[max[0] + 0.05, top, max[1] + 0.05]} color={cap} />
-      {pillars.map(([px, pz], i) => (
-        <Block key={i} min={[px - 0.3, PLINTH_TOP, pz - 0.3]} max={[px + 0.3, top - thickness, pz + 0.3]} color={body} />
+      {supports.map(([x0, z0, x1, z1, base], i) => (
+        <Block key={i} min={[x0, base ?? PLINTH_TOP, z0]} max={[x1, top - thickness, z1]} color={body} />
       ))}
+      {/* Window slits on the camera-facing side of the back wall */}
+      {[-4, -2, 0].flatMap((x) =>
+        [3.5, 7.5].map((y) => (
+          <mesh
+            key={`${x}-${y}`}
+            geometry={UNIT_BOX}
+            material={WINDOW_MAT}
+            position={[x, y, supports[0][3] + 0.01]}
+            scale={[0.36, 0.9, 0.04]}
+          />
+        )),
+      )}
       {[-1.8, -0.9, 0, 0.9, 1.8].map((d) => (
         <mesh
           key={d}

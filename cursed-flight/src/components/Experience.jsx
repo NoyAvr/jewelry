@@ -12,10 +12,10 @@ import PowerUpManager from './PowerUpManager.jsx'
 export const BACKGROUND = '#A3D9C9'
 
 /** World units that must stay visible (width × height) — used for responsive zoom. */
-const VIEW_WIDTH = 17
-const VIEW_HEIGHT = 18.5
+const VIEW_WIDTH = 19
+const VIEW_HEIGHT = 23.5
 /** Shifts the tower so it sits centred (with headroom for the HUD) around the origin the camera looks at. */
-const WORLD_OFFSET = [0, -2.7, 0]
+const WORLD_OFFSET = [0, -5.3, 0]
 
 /**
  * Isometric orthographic camera at [10, 10, 10] looking at the origin.

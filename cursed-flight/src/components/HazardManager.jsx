@@ -176,7 +176,7 @@ export default function HazardManager() {
     const c = clock.current
     c.elapsed += dt
     if (phase === 'playing') {
-      const difficulty = THREE.MathUtils.clamp(c.elapsed / 75 + NODES[currentNode].floor / 8, 0, 1)
+      const difficulty = THREE.MathUtils.clamp(c.elapsed / 75 + NODES[currentNode].floor / 10, 0, 1)
       c.nextSpawn -= dt
       if (c.nextSpawn <= 0) {
         spawn(difficulty)

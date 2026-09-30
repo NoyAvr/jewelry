@@ -25,7 +25,9 @@ export const PALETTE = {
     { body: '#E07A5F', cap: '#F2A98F' }, // 1 terracotta
     { body: '#5BBCB0', cap: '#94DCD2' }, // 2 turquoise
     { body: '#E9D8BE', cap: '#F7EDDC' }, // 3 beige
-    { body: '#F4ACB7', cap: '#FAD1D7' }, // 4 blush (plane deck)
+    { body: '#F4ACB7', cap: '#FAD1D7' }, // 4 blush
+    { body: '#B8A6E3', cap: '#D9CEF4' }, // 5 lavender
+    { body: '#7FB8E0', cap: '#B7DAF2' }, // 6 sky blue (rooftop runway)
   ],
   arch: '#FFF8EE',
   accent: '#3D9A8B',
@@ -66,15 +68,32 @@ export const NODES = {
   // Stair D (+z) up to floor 4
   stairD: { pos: [-4, 7, -2], kind: 'stair', floor: 4 },
 
-  // Floor 4 — the runway deck (slab on pillars so the walkway behind stays visible)
+  // Floor 4 — blush deck (slab on pillars so the walkway behind stays visible);
+  // the rooftop runway overhangs it
   deck: { pos: [-4, 8, 0], kind: 'tile', floor: 4, support: 'pillars' },
   deckE: { pos: [-2, 8, 0], kind: 'tile', floor: 4, support: 'pillars' },
-  gateway: { pos: [-2, 8, 2], kind: 'tile', floor: 4, goal: true },
+
+  // Stair E (+z) from the deck's east end up to floor 5
+  stairE: { pos: [-2, 9, 2], kind: 'stair', floor: 5 },
+
+  // Floor 5 — lavender terrace at the front-left, on pillars
+  terrace5E: { pos: [-2, 10, 4], kind: 'tile', floor: 5, support: 'pillars' },
+  terrace5W: { pos: [-4, 10, 4], kind: 'tile', floor: 5, support: 'pillars' },
+
+  // Stair F (−z) up to floor 6 — a floating flight so it doesn't hide the deck behind it
+  stairF: { pos: [-4, 11, 2], kind: 'stair', floor: 6, support: 'floating' },
+
+  // Floor 6 — rooftop runway with the plane
+  roofW: { pos: [-4, 12, 0], kind: 'tile', floor: 6 },
+  roofS: { pos: [-2, 12, 0], kind: 'tile', floor: 6 },
+  roofE: { pos: [0, 12, 0], kind: 'tile', floor: 6 },
+  roofN: { pos: [0, 12, -2], kind: 'tile', floor: 6 },
+  gateway: { pos: [0, 12, -4], kind: 'tile', floor: 6, goal: true },
 }
 
 export const START_NODE = 'start'
 export const GOAL_NODE = 'gateway'
-export const TOP_FLOOR = 4
+export const TOP_FLOOR = 6
 
 /** Undirected connections between nodes. */
 export const EDGES = [
@@ -97,7 +116,15 @@ export const EDGES = [
   ['walkW', 'stairD'],
   ['stairD', 'deck'],
   ['deck', 'deckE'],
-  ['deckE', 'gateway'],
+  ['deckE', 'stairE'],
+  ['stairE', 'terrace5E'],
+  ['terrace5E', 'terrace5W'],
+  ['terrace5W', 'stairF'],
+  ['stairF', 'roofW'],
+  ['roofW', 'roofS'],
+  ['roofS', 'roofE'],
+  ['roofE', 'roofN'],
+  ['roofN', 'gateway'],
 ]
 
 /**
@@ -109,7 +136,7 @@ export const STAIRS = Object.entries(NODES)
   .map(([id, n]) => {
     const [a, b] = EDGES.filter((e) => e.includes(id)).map((e) => (e[0] === id ? e[1] : e[0]))
     const [low, high] = NODES[a].pos[1] < NODES[b].pos[1] ? [a, b] : [b, a]
-    return { id, low, high, floor: n.floor }
+    return { id, low, high, floor: n.floor, support: n.support }
   })
 
 /** Adjacency list, built once. */
@@ -123,14 +150,26 @@ export const ADJACENCY = (() => {
 })()
 
 /**
- * The runway pad the plane rests on (a slab on pillars, top at y = 8).
- * The goal tile ("gateway") sits on its inner corner.
+ * The rooftop runway the plane rests on (top at y = 12). It is carried by a tall back
+ * wall behind the floor-3 walkway plus a few pillars, and overhangs the floor-4 deck.
+ * Every floor-6 node stands on it.
  */
-export const PLANE_PAD = { min: [-5.8, 1], max: [-1, 5.8], top: 8, thickness: 0.5 }
+export const PLANE_PAD = {
+  min: [-5, -6.2],
+  max: [1, 1],
+  top: 12,
+  thickness: 0.5,
+  // Supports as [minX, minZ, maxX, maxZ, baseY] boxes rising to the slab's underside.
+  supports: [
+    [-5, -6.2, 1, -5, null], // back wall (from the plinth)
+    [-2.35, -2.35, -1.65, -1.65, null], // pillar in the empty courtyard
+    [-4.85, 0.45, -4.45, 0.85, 8], // pillar standing on the floor-4 deck
+  ],
+}
 
 /** Where the plane rests and which way its nose points (radians around Y). */
 export const PLANE_TRANSFORM = {
-  position: [-3.9, 8, 3.9],
+  position: [-3.1, 12, -3.1],
   scale: 0.85,
   // The model's nose points down +x; this turns it towards −x/+z (screen-left).
   rotationY: (-3 * Math.PI) / 4,
@@ -154,4 +193,4 @@ export const TREES = [
 ]
 
 /** Plinth footprint the whole level stands on. */
-export const PLINTH = { min: [-6.2, -6], max: [6.8, 6.6] }
+export const PLINTH = { min: [-6.2, -6.8], max: [6.8, 6.6] }
