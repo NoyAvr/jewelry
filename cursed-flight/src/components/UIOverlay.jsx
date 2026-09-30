@@ -309,7 +309,7 @@ function FalseAlarmToast() {
   const ref = useRef()
   useLayoutEffect(() => {
     if (!alarm) return
-    const tween = gsap.fromTo(ref.current, { y: -16, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(2)' })
+    const tween = gsap.fromTo(ref.current, { y: 16, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(2)' })
     const timer = setTimeout(() => useGame.getState().clearFalseAlarm(alarm.id), FALSE_ALARM_TOAST_MS)
     return () => {
       tween.kill()
@@ -318,14 +318,16 @@ function FalseAlarmToast() {
   }, [alarm])
   if (!alarm) return null
   return (
-    <div className="pointer-events-none absolute top-40 right-4 left-4 flex justify-center sm:top-24">
+    // Sits low on the screen so it never covers the tower: above the D-pad on phones,
+    // and in the empty bottom-left corner just above the controls hint on larger screens.
+    <div className="pointer-events-none absolute right-4 bottom-40 left-4 flex justify-center sm:right-auto sm:bottom-20 sm:left-6">
       <div
         key={alarm.id}
         ref={ref}
-        className="max-w-sm rounded-2xl border-2 border-mint-deep bg-cream/95 px-5 py-3 text-center shadow-lg backdrop-blur"
+        className="max-w-md rounded-2xl border-2 border-mint-deep bg-cream/90 px-4 py-2 text-center shadow-md backdrop-blur"
       >
-        <div className="text-lg font-bold text-mint-deep">אזעקת שווא!</div>
-        <div className="mt-0.5 text-sm font-semibold text-ink">{HAZARD_TYPES[alarm.type].falseAlarm}</div>
+        <span className="font-bold text-mint-deep">אזעקת שווא! </span>
+        <span className="text-sm font-semibold text-ink">{HAZARD_TYPES[alarm.type].falseAlarm}</span>
       </div>
     </div>
   )
