@@ -512,7 +512,7 @@ function OptionsMenu() {
         <div
           ref={menu}
           role="menu"
-          className="pointer-events-auto absolute top-full left-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl bg-cream py-1.5 text-ink shadow-[0_16px_40px_-12px_rgba(47,62,70,0.5)]"
+          className="pointer-events-auto absolute top-full right-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl bg-cream py-1.5 text-ink shadow-[0_16px_40px_-12px_rgba(47,62,70,0.5)]"
         >
           {OPTION_ITEMS.map((item) => (
             <button
@@ -552,13 +552,15 @@ function HUD() {
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
-      {/* justify-end keeps the counters + options on the left in this RTL layout */}
-      <header className="flex items-start justify-end gap-3">
+      {/* RTL layout: the options menu sits at the right edge, the counters at the left */}
+      <header className="flex items-start justify-between gap-3">
+        <div data-hud>
+          <OptionsMenu />
+        </div>
         <div data-hud className="flex items-start gap-2">
           <Chip label="שלב" value={`${level + 1}/${LEVELS.length}`} />
           <Chip label="קומה" value={`${floor}/${TOP_FLOOR}`} />
           <Chip label="בוטלו" value={cancellations} />
-          <OptionsMenu />
         </div>
       </header>
 
