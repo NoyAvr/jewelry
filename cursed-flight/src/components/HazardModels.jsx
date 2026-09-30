@@ -68,13 +68,26 @@ export function MissileModel() {
   )
 }
 
-export function RubbleModel() {
+/** A small jet in a nose-dive: nose at the bottom, tail fin at the top. */
+export function CrashingPlaneModel() {
   return (
-    <group>
-      <B p={[-0.12, -0.08, 0.05]} s={[0.42, 0.24, 0.26]} c="#D9744F" r={[0.2, 0.3, 0.1]} />
-      <B p={[0.18, 0.05, -0.08]} s={[0.34, 0.22, 0.24]} c="#E9D8BE" r={[-0.3, 0.8, 0.2]} />
-      <B p={[0.02, 0.2, 0.12]} s={[0.26, 0.18, 0.2]} c="#C9674A" r={[0.5, -0.4, 0.3]} />
-      <B p={[-0.2, 0.16, -0.16]} s={[0.14, 0.12, 0.12]} c="#F2CC8F" r={[0.2, 0.2, 0.7]} />
+    <group rotation={[0, 0, 0.25]}>
+      <mesh material={flatMaterial('#FDFBF7')} castShadow>
+        <cylinderGeometry args={[0.11, 0.11, 0.62, 8]} />
+      </mesh>
+      <mesh position={[0, -0.41, 0]} rotation={[Math.PI, 0, 0]} material={flatMaterial('#FDFBF7')} castShadow>
+        <coneGeometry args={[0.11, 0.2, 8]} />
+      </mesh>
+      <B p={[0, -0.3, 0.1]} s={[0.12, 0.06, 0.03]} c="#3F5A63" />
+      <B p={[0, -0.02, 0]} s={[0.84, 0.16, 0.04]} c="#C9D3D6" />
+      <B p={[0, 0.29, 0]} s={[0.34, 0.08, 0.03]} c="#C9D3D6" />
+      <B p={[0, 0.34, -0.1]} s={[0.03, 0.2, 0.18]} c="#E85D4A" />
+      {[-0.22, 0.22].map((x) => (
+        <B key={x} p={[x, 0.02, 0.07]} s={[0.08, 0.16, 0.08]} c="#8C9AA0" />
+      ))}
+      {/* Engine smoke trailing upwards */}
+      <B p={[-0.22, 0.2, 0.07]} s={[0.1, 0.18, 0.1]} c="#6E7477" r={[0.3, 0.4, 0]} />
+      <B p={[-0.2, 0.36, 0.07]} s={[0.14, 0.14, 0.14]} c="#8C9194" r={[0.6, 0.2, 0.3]} />
     </group>
   )
 }
@@ -119,7 +132,7 @@ export function MedkitModel() {
 export const HAZARD_MODELS = {
   crab: CrabModel,
   missile: MissileModel,
-  rubble: RubbleModel,
+  plane: CrashingPlaneModel,
   tv: TVModel,
   medkit: MedkitModel,
 }

@@ -15,11 +15,11 @@ export const HAZARD_TYPES = {
     title: 'Airspace Closed',
     reason: 'War broke out overnight — all flights are grounded.',
   },
-  rubble: {
-    radius: 0.45,
-    tumble: 1.2,
-    title: 'Terminal Collapse',
-    reason: 'Falling rubble! The departures hall is closed for repairs.',
+  plane: {
+    radius: 0.42,
+    tumble: 0, // nose-dives in a tight spiral instead of tumbling
+    title: 'Airline Grounded',
+    reason: "A terrorist pilot attempted to crash a plane, and all of the airline's flights were cancelled.",
   },
   tv: {
     radius: 0.42,

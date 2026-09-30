@@ -37,7 +37,7 @@ src/
 │   ├── Airplane.jsx            Low-poly jet + GSAP take-off timeline
 │   ├── Player.jsx              The voxel parents, waypoint movement, walk cycle, hitbox
 │   ├── HazardManager.jsx       Pooled spawner, falling physics, warning rings, collision
-│   ├── HazardModels.jsx        Crab, missile, rubble, TV, medkit
+│   ├── HazardModels.jsx        Crab, missile, crashing plane, TV, medkit
 │   └── UIOverlay.jsx           Tailwind HUD, D-pad, Start / Game Over / Victory cards (GSAP)
 └── game/
     ├── levelData.js            Nodes, edges, palette: the single source of truth for the level
