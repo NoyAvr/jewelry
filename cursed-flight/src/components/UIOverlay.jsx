@@ -128,7 +128,6 @@ function IntroScreen() {
 function GameOverScreen() {
   const cause = useGame((s) => s.cause)
   const restart = useGame((s) => s.restart)
-  const quit = useGame((s) => s.quit)
   const hazard = HAZARD_TYPES[cause] ?? { title: 'קללה לא ידועה', reason: 'אף אחד לא יודע מה קרה.' }
   return (
     <Modal tone="danger">
@@ -151,14 +150,11 @@ function GameOverScreen() {
         בוטלה
       </div>
       <Perforation />
-      <div className="flex flex-wrap items-center justify-center gap-2 px-7 pt-2 pb-7">
+      <div className="flex justify-center px-7 pt-2 pb-7">
         <div data-stagger>
           <PrimaryButton onClick={restart} autoFocus>
             להזמין שוב ולנסות
           </PrimaryButton>
-        </div>
-        <div data-stagger>
-          <SecondaryButton onClick={quit}>יציאה מהמשחק</SecondaryButton>
         </div>
       </div>
     </Modal>
