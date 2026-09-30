@@ -1,14 +1,17 @@
 import { create } from 'zustand'
-import { NODES, START_NODE } from './levelData.js'
+import { LEVELS, NODES, setLevel, START_NODE } from './levelData.js'
 
 /**
  * Low-frequency game state (phases, HUD values, player commands).
  * Anything that changes every frame lives in runtime.js instead.
  *
  * Phases: intro → playing → (gameover | boarding → won)
+ * After winning, nextLevel() moves on; after the last level, playAgain() starts over.
  */
 export const useGame = create((set, get) => ({
   phase: 'intro',
+  /** Index into LEVELS of the tower being played. */
+  level: 0,
   /** Bumped on every (re)start; used as a React key to fully reset the scene. */
   runId: 0,
   /** Hazard type that cancelled the flight (for the Game Over copy). */
@@ -28,9 +31,21 @@ export const useGame = create((set, get) => ({
 
   start: () => set({ phase: 'playing', startedAt: performance.now() }),
 
-  restart: () =>
+  /** Replays the current level from the bottom. */
+  restart: () => get().loadLevel(get().level),
+
+  /** Moves on to the next tower after a win. */
+  nextLevel: () => get().loadLevel(Math.min(get().level + 1, LEVELS.length - 1)),
+
+  /** Starts the whole journey over from level 1. */
+  playAgain: () => get().loadLevel(0),
+
+  /** Switches the active level data, then remounts the scene (via runId) with a clean slate. */
+  loadLevel: (level) => {
+    setLevel(level)
     set((s) => ({
       phase: 'playing',
+      level,
       runId: s.runId + 1,
       cause: null,
       currentNode: START_NODE,
@@ -38,7 +53,8 @@ export const useGame = create((set, get) => ({
       shield: null,
       falseAlarm: null,
       startedAt: performance.now(),
-    })),
+    }))
+  },
 
   /** Called by HazardManager when a curse lands on the parents. */
   cancelFlight: (hazardType) => {

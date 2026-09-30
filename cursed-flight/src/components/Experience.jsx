@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import { OrthographicCamera } from '@react-three/drei'
 import gsap from 'gsap'
-import { PLINTH_TOP } from '../game/levelData.js'
+import { CAMERA, PLINTH_TOP } from '../game/levelData.js'
 import { useGame } from '../game/store.js'
 import LevelArchitecture from './LevelArchitecture.jsx'
 import Player from './Player.jsx'
@@ -11,11 +11,11 @@ import PowerUpManager from './PowerUpManager.jsx'
 
 export const BACKGROUND = '#A3D9C9'
 
-/** World units that must stay visible (width × height) — used for responsive zoom. */
-const VIEW_WIDTH = 19
-const VIEW_HEIGHT = 23.5
-/** Shifts the tower so it sits centred (with headroom for the HUD) around the origin the camera looks at. */
-const WORLD_OFFSET = [0, -5.3, 0]
+/*
+ * Per level (see CAMERA in levelData.js): viewWidth × viewHeight world units must stay
+ * visible (responsive zoom), and offsetY shifts the tower so it sits centred, with
+ * headroom for the HUD, around the origin the camera looks at.
+ */
 
 /**
  * Isometric orthographic camera at [10, 10, 10] looking at the origin.
@@ -24,13 +24,14 @@ const WORLD_OFFSET = [0, -5.3, 0]
 function IsometricCamera() {
   const camera = useRef()
   const { width, height } = useThree((s) => s.size)
+  const level = useGame((s) => s.level)
 
   useLayoutEffect(() => {
     const cam = camera.current
     cam.lookAt(0, 0, 0)
-    cam.zoom = Math.min(width / VIEW_WIDTH, height / VIEW_HEIGHT)
+    cam.zoom = Math.min(width / CAMERA.viewWidth, height / CAMERA.viewHeight)
     cam.updateProjectionMatrix()
-  }, [width, height])
+  }, [width, height, level])
 
   return <OrthographicCamera ref={camera} makeDefault position={[10, 10, 10]} near={-50} far={200} />
 }
@@ -78,8 +79,8 @@ function useImpactShake(target) {
         if (state.phase !== 'gameover' || prev.phase === 'gameover' || !target.current) return
         gsap.fromTo(
           target.current.position,
-          { x: WORLD_OFFSET[0] + 0.25 },
-          { x: WORLD_OFFSET[0], duration: 0.6, ease: 'elastic.out(1.2, 0.25)' },
+          { x: 0.25 },
+          { x: 0, duration: 0.6, ease: 'elastic.out(1.2, 0.25)' },
         )
       }),
     [target],
@@ -97,7 +98,7 @@ export default function Experience() {
       <IsometricCamera />
       <Lights />
 
-      <group ref={world} position={WORLD_OFFSET}>
+      <group ref={world} position={[0, CAMERA.offsetY, 0]}>
         <Ground />
         <LevelArchitecture />
         {/* Keyed by run: a restart remounts these systems with a clean slate */}

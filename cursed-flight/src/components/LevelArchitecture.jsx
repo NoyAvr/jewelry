@@ -192,10 +192,10 @@ function Parapet({ node, sides }) {
   return sides.map((s) => <Block key={s} min={boxes[s][0]} max={boxes[s][1]} color={color} />)
 }
 
-/** The rooftop runway: a slab on a back wall and pillars, with dashed runway markings. */
+/** The plane's runway pad: a slab on its supports (pillars / a back wall), with dashed markings. */
 function PlanePad() {
-  const { min, max, top, thickness, supports } = PLANE_PAD
-  const { body, cap } = PALETTE.floors[6]
+  const { min, max, top, thickness, supports, floor, wallWindows } = PLANE_PAD
+  const { body, cap } = PALETTE.floors[floor]
   // Runway centreline along the plane's heading (−x/+z diagonal), through the plane.
   const [cx, , cz] = PLANE_TRANSFORM.position
   return (
@@ -206,17 +206,18 @@ function PlanePad() {
         <Block key={i} min={[x0, base ?? PLINTH_TOP, z0]} max={[x1, top - thickness, z1]} color={body} />
       ))}
       {/* Window slits on the camera-facing side of the back wall */}
-      {[-4, -2, 0].flatMap((x) =>
-        [3.5, 7.5].map((y) => (
-          <mesh
-            key={`${x}-${y}`}
-            geometry={UNIT_BOX}
-            material={WINDOW_MAT}
-            position={[x, y, supports[0][3] + 0.01]}
-            scale={[0.36, 0.9, 0.04]}
-          />
-        )),
-      )}
+      {wallWindows &&
+        [-4, -2, 0].flatMap((x) =>
+          [3.5, 7.5].map((y) => (
+            <mesh
+              key={`${x}-${y}`}
+              geometry={UNIT_BOX}
+              material={WINDOW_MAT}
+              position={[x, y, supports[0][3] + 0.01]}
+              scale={[0.36, 0.9, 0.04]}
+            />
+          )),
+        )}
       {[-1.8, -0.9, 0, 0.9, 1.8].map((d) => (
         <mesh
           key={d}
@@ -366,16 +367,18 @@ const StaticArchitecture = memo(function StaticArchitecture() {
 
 export default function LevelArchitecture() {
   const runId = useGame((s) => s.runId)
+  const level = useGame((s) => s.level)
   return (
     <group>
-      <StaticArchitecture />
+      {/* Keyed by level: the static tower is rebuilt when the level changes */}
+      <StaticArchitecture key={`tower-${level}`} />
       {Object.keys(NODES).map((id) => (
-        <WalkableNode key={id} id={id} />
+        <WalkableNode key={`${level}-${id}`} id={id} />
       ))}
       <DestinationMarker />
       <GoalBeacon />
       {/* Keyed by run so the plane is parked again after every restart */}
-      <Airplane key={runId} />
+      <Airplane key={`plane-${runId}`} />
     </group>
   )
 }

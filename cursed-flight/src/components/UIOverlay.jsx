@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
-import { TOP_FLOOR } from '../game/levelData.js'
+import { LEVELS, TOP_FLOOR } from '../game/levelData.js'
 import { HAZARD_TYPES } from '../game/hazards.js'
 import { POWERUP_TYPES, SHIELD_SECONDS } from '../game/powerups.js'
 import { selectFloor, useGame } from '../game/store.js'
@@ -150,19 +150,28 @@ function GameOverScreen() {
   )
 }
 
+/**
+ * Shown when the plane takes off. After an earlier level it leads on to the next,
+ * taller tower; after the last level it is the final victory and starts over.
+ */
 function VictoryScreen() {
   const time = useGame((s) => s.finishTime)
   const cancellations = useGame((s) => s.cancellations)
-  const restart = useGame((s) => s.restart)
+  const level = useGame((s) => s.level)
+  const nextLevel = useGame((s) => s.nextLevel)
+  const playAgain = useGame((s) => s.playAgain)
+  const isLast = level === LEVELS.length - 1
   return (
     <Modal>
-      <PassHeader color="bg-mint-deep" label="המריאה" />
+      <PassHeader color="bg-mint-deep" label={isLast ? 'המריאה' : `שלב ${level + 1} הושלם`} />
       <div className="px-7 pt-5">
         <h2 data-stagger className="pl-32 font-hebrew text-3xl leading-tight font-bold">
-          הטיסה המריאה בהצלחה!
+          {isLast ? 'הטיסה המריאה בהצלחה!' : 'הטיסה הראשונה המריאה!'}
         </h2>
         <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
-          אמא ואבא סוף סוף באוויר. הקללה נשברה, לפחות בינתיים.
+          {isLast
+            ? 'אמא ואבא סוף סוף באוויר. הקללה נשברה, לפחות בינתיים.'
+            : `אמא ואבא נחתו בקונקשן. עכשיו מחכה להם מגדל גבוה יותר, עם ${LEVELS[level + 1].topFloor} קומות, בדרך לטיסת ההמשך.`}
         </p>
       </div>
       <div
@@ -183,8 +192,8 @@ function VictoryScreen() {
         </div>
       </div>
       <div data-stagger className="flex justify-center px-7 pt-6 pb-7">
-        <PrimaryButton onClick={restart} autoFocus>
-          לטוס שוב
+        <PrimaryButton onClick={isLast ? playAgain : nextLevel} autoFocus>
+          {isLast ? 'לשחק מההתחלה' : 'לשלב הבא'}
         </PrimaryButton>
       </div>
     </Modal>
@@ -330,6 +339,7 @@ function HUD() {
   const root = useRef()
   const phase = useGame((s) => s.phase)
   const floor = useGame(selectFloor)
+  const level = useGame((s) => s.level)
   const cancellations = useGame((s) => s.cancellations)
   const restart = useGame((s) => s.restart)
 
@@ -350,6 +360,7 @@ function HUD() {
           </p>
         </div>
         <div data-hud className="flex items-start gap-2">
+          <Chip label="שלב" value={`${level + 1}/${LEVELS.length}`} />
           <Chip label="קומה" value={`${floor}/${TOP_FLOOR}`} />
           <Chip label="בוטלו" value={cancellations} />
           <button

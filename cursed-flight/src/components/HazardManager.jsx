@@ -19,7 +19,6 @@ const SPAWN_INTERVAL = [1.35, 0.55] // seconds between spawns: [easy, hard]
 const FALL_TIME = [1.55, 1.05] // seconds from spawn to impact: [easy, hard]
 const IMPACT_TIME = 0.45 // squash + shockwave duration
 const IMPACT_LETHAL_TIME = 0.08 // landing still hurts for a split second
-const ALL_NODES = Object.keys(NODES)
 /** Playtesting aid: `?invincible` in the URL disables hazard collisions. */
 const INVINCIBLE = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('invincible')
 
@@ -38,7 +37,7 @@ function pickTarget(busy) {
   const focus = [playerRuntime.nextNode, playerRuntime.queue[0], playerRuntime.currentNode]
   const nearby = nodesWithin(here, 3)
   const roll = Math.random()
-  const pool = roll < 0.5 ? focus : roll < 0.85 ? nearby : ALL_NODES
+  const pool = roll < 0.5 ? focus : roll < 0.85 ? nearby : Object.keys(NODES)
   const free = (list) => list.filter((id) => id && id !== GOAL_NODE && !busy.has(id))
   const candidates = free(pool)
   return candidates.length ? pick(candidates) : pick(free(nearby)) ?? null

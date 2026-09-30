@@ -20,10 +20,12 @@ const HITBOX_SIZE = new THREE.Vector3(1.0, 1.1, 1.0)
 const DEBUG = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')
 
 /** World point by the plane's rear door where the parents disappear when boarding. */
-const BOARDING_POINT = new THREE.Vector3(-1.4, 0, 0)
-  .multiplyScalar(PLANE_TRANSFORM.scale)
-  .applyAxisAngle(new THREE.Vector3(0, 1, 0), PLANE_TRANSFORM.rotationY)
-  .add(new THREE.Vector3(...PLANE_TRANSFORM.position))
+function boardingPoint() {
+  return new THREE.Vector3(-1.4, 0, 0)
+    .multiplyScalar(PLANE_TRANSFORM.scale)
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), PLANE_TRANSFORM.rotationY)
+    .add(new THREE.Vector3(...PLANE_TRANSFORM.position))
+}
 
 const SKIN = flatMaterial('#F1C7A5')
 
@@ -208,7 +210,8 @@ export default function Player() {
   useEffect(() => {
     let ctx
     const unsub = useGame.subscribe((state, prev) => {
-      if (state.phase === prev.phase) return
+      // 'won' follows 'boarding': keep the parents inside the plane rather than undoing that tween.
+      if (state.phase === prev.phase || state.phase === 'won') return
       ctx?.revert()
       ctx = gsap.context(() => {
         if (state.phase === 'gameover') {
@@ -216,10 +219,11 @@ export default function Player() {
           gsap.to(couple.current.scale, { y: 0.28, x: 1.35, z: 1.35, duration: 0.5, ease: 'elastic.out(1, 0.4)' })
         }
         if (state.phase === 'boarding') {
+          const door = boardingPoint()
           const p = root.current.position
-          yawGroup.current.rotation.y = Math.atan2(BOARDING_POINT.x - p.x, BOARDING_POINT.z - p.z)
+          yawGroup.current.rotation.y = Math.atan2(door.x - p.x, door.z - p.z)
           motion.current.walk = 1
-          gsap.to(p, { x: BOARDING_POINT.x, z: BOARDING_POINT.z, duration: 0.8, ease: 'none' })
+          gsap.to(p, { x: door.x, z: door.z, duration: 0.8, ease: 'none' })
           gsap.to(couple.current.scale, { x: 0, y: 0, z: 0, duration: 0.35, delay: 0.6, ease: 'back.in(2)' })
         }
       })

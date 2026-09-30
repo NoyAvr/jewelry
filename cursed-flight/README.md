@@ -41,7 +41,7 @@ src/
 │   ├── PowerUpManager.jsx      Prayer (Torah scroll) and summon (crystal) drops that grant a short shield
 │   └── UIOverlay.jsx           Tailwind HUD, D-pad, Start / Game Over / Victory cards (GSAP)
 └── game/
-    ├── levelData.js            Nodes, edges, palette: the single source of truth for the level
+    ├── levelData.js            Both levels (4-floor and 6-floor towers): nodes, edges, pad, camera, palette
     ├── navigation.js           BFS, D-pad neighbour lookup, stair-aware walking height
     ├── hazards.js              Hazard types + their "flight canceled" copy
     ├── powerups.js             Pickup types + shield duration
@@ -61,7 +61,7 @@ Performance notes:
 
 ## Tuning
 
-- Level layout: `src/game/levelData.js`. The geometry is derived from `NODES`/`EDGES`, so what
+- Level layouts: `LEVEL_1` / `LEVEL_2` in `src/game/levelData.js` (add more to `LEVELS`). The geometry is derived from `NODES`/`EDGES`, so what
   you see is exactly what you can walk on.
 - Difficulty: `SPAWN_INTERVAL`, `FALL_TIME` and `POOL_SIZE` in `HazardManager.jsx`.
 - Shield length: `SHIELD_SECONDS` in `powerups.js`; drop frequency in `PowerUpManager.jsx`.
