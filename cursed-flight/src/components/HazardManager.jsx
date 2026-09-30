@@ -169,7 +169,7 @@ export default function HazardManager() {
     const dt = Math.min(delta, 0.05)
     const { phase, cancelFlight, raiseFalseAlarm, currentNode } = useGame.getState()
     // Nothing falls before the game starts; everything freezes dramatically on Game Over.
-    if (phase === 'intro' || phase === 'gameover') return
+    if (phase === 'intro' || phase === 'gameover' || phase === 'paused') return
 
     // --- Spawning (ramps up with time and altitude) ---
     const c = clock.current

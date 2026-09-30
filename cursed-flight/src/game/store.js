@@ -7,6 +7,7 @@ import { LEVELS, NODES, setLevel, START_NODE } from './levelData.js'
  *
  * Phases: intro → playing → (gameover | boarding → won)
  * After winning, nextLevel() moves on; after the last level, playAgain() starts over.
+ * askQuit() pauses play ('paused') until resume() or quit(), which goes back to the intro at level 1.
  */
 export const useGame = create((set, get) => ({
   phase: 'intro',
@@ -39,6 +40,30 @@ export const useGame = create((set, get) => ({
 
   /** Starts the whole journey over from level 1. */
   playAgain: () => get().loadLevel(0),
+
+  /** Pauses the game while the player confirms quitting. */
+  askQuit: () => get().phase === 'playing' && set({ phase: 'paused', pausedAt: performance.now() }),
+
+  /** Closes the quit prompt; the pause doesn't count towards the climb time. */
+  resume: () =>
+    get().phase === 'paused' &&
+    set((s) => ({ phase: 'playing', startedAt: s.startedAt + (performance.now() - s.pausedAt) })),
+
+  /** Quits to the start screen; the next journey starts from level 1 with a clean slate. */
+  quit: () => {
+    setLevel(0)
+    set((s) => ({
+      phase: 'intro',
+      level: 0,
+      runId: s.runId + 1,
+      cancellations: 0,
+      cause: null,
+      currentNode: START_NODE,
+      command: null,
+      shield: null,
+      falseAlarm: null,
+    }))
+  },
 
   /** Switches the active level data, then remounts the scene (via runId) with a clean slate. */
   loadLevel: (level) => {

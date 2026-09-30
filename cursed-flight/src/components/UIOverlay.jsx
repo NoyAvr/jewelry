@@ -21,6 +21,17 @@ function PrimaryButton({ children, onClick, autoFocus }) {
   )
 }
 
+function SecondaryButton({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="pointer-events-auto rounded-full px-5 py-3 whitespace-nowrap font-hebrew text-base font-semibold text-ink-soft underline-offset-4 transition hover:text-ink hover:underline focus:outline-none focus-visible:ring-4 focus-visible:ring-sand"
+    >
+      {children}
+    </button>
+  )
+}
+
 function Chip({ label, value }) {
   return (
     <div className="rounded-2xl bg-cream/80 px-3 py-1.5 text-center shadow-sm backdrop-blur">
@@ -117,6 +128,7 @@ function IntroScreen() {
 function GameOverScreen() {
   const cause = useGame((s) => s.cause)
   const restart = useGame((s) => s.restart)
+  const quit = useGame((s) => s.quit)
   const hazard = HAZARD_TYPES[cause] ?? { title: 'קללה לא ידועה', reason: 'אף אחד לא יודע מה קרה.' }
   return (
     <Modal tone="danger">
@@ -139,11 +151,14 @@ function GameOverScreen() {
         בוטלה
       </div>
       <Perforation />
-      <div className="flex justify-center px-7 pt-2 pb-7">
+      <div className="flex flex-wrap items-center justify-center gap-2 px-7 pt-2 pb-7">
         <div data-stagger>
           <PrimaryButton onClick={restart} autoFocus>
             להזמין שוב ולנסות
           </PrimaryButton>
+        </div>
+        <div data-stagger>
+          <SecondaryButton onClick={quit}>יציאה מהמשחק</SecondaryButton>
         </div>
       </div>
     </Modal>
@@ -200,6 +215,29 @@ function VictoryScreen() {
   )
 }
 
+/** Confirms quitting while the game is paused; quitting goes back to the start at level 1. */
+function QuitScreen() {
+  const resume = useGame((s) => s.resume)
+  const quit = useGame((s) => s.quit)
+  return (
+    <Modal>
+      <PassHeader color="bg-ink-soft" label="המשחק מושהה" />
+      <div className="px-7 pt-5 pb-7">
+        <h2 data-stagger className="font-hebrew text-3xl font-bold">
+          לצאת מהמשחק?
+        </h2>
+        <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
+          תחזרו למסך הפתיחה, וההתקדמות תתאפס: המסע יתחיל מחדש משלב 1.
+        </p>
+        <div data-stagger className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <PrimaryButton onClick={quit}>כן, לצאת</PrimaryButton>
+          <SecondaryButton onClick={resume}>להמשיך לשחק</SecondaryButton>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Controls: keyboard + on-screen isometric D-pad
  * --------------------------------------------------------------------------------------------- */
@@ -219,7 +257,10 @@ const KEYMAP = {
 function useKeyboardControls() {
   useEffect(() => {
     const onKey = (e) => {
-      const { phase, issueCommand, restart } = useGame.getState()
+      const { phase, issueCommand, restart, askQuit, resume } = useGame.getState()
+      // Escape opens the quit prompt, and closes it again.
+      if (e.code === 'Escape') return phase === 'paused' ? resume() : askQuit()
+      if (phase === 'paused') return
       if (e.code === 'KeyR' && phase !== 'intro') return restart()
       const dir = KEYMAP[e.code]
       if (!dir) return
@@ -344,6 +385,7 @@ function HUD() {
   const level = useGame((s) => s.level)
   const cancellations = useGame((s) => s.cancellations)
   const restart = useGame((s) => s.restart)
+  const askQuit = useGame((s) => s.askQuit)
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -377,13 +419,27 @@ function HUD() {
               <path d="M3 4v5h5" />
             </svg>
           </button>
+          <button
+            onClick={askQuit}
+            disabled={phase !== 'playing'}
+            aria-label="יציאה מהמשחק"
+            title="יציאה מהמשחק (Esc)"
+            className="pointer-events-auto flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-cream/85 text-ink shadow-[0_4px_0_rgba(47,62,70,0.25)] backdrop-blur transition hover:bg-cream active:translate-y-0.5 active:shadow-none disabled:opacity-40"
+          >
+            {/* Door with an arrow leading out */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+              <path d="M9 8l-4 4 4 4" />
+              <path d="M5 12h10" />
+            </svg>
+          </button>
         </div>
       </header>
 
       {/* dir="ltr" keeps the D-pad bottom-right (thumb side); the hint text itself stays RTL. */}
       <footer dir="ltr" className="flex items-end justify-between gap-3">
         <p data-hud dir="rtl" className="hidden rounded-full bg-cream/70 px-4 py-2 text-xs font-semibold text-ink-soft backdrop-blur sm:block">
-          לחצו על משבצת כדי ללכת · חיצים / WASD לצעד אחד · R להתחלה מחדש
+          לחצו על משבצת כדי ללכת · חיצים / WASD לצעד אחד · R להתחלה מחדש · Esc ליציאה
         </p>
         {/* GSAP owns the outer div's inline opacity; the inner one fades with the game phase. */}
         <div data-hud className="ml-auto">
@@ -413,6 +469,7 @@ export default function UIOverlay() {
       {phase === 'intro' && <IntroScreen />}
       {phase === 'gameover' && <GameOverScreen key={`over-${runId}`} />}
       {phase === 'won' && <VictoryScreen key={`won-${runId}`} />}
+      {phase === 'paused' && <QuitScreen />}
     </div>
   )
 }
