@@ -31,6 +31,16 @@ body,
   touch-action: none;
 }
 
+/* Shield timer bar in the HUD: drains from full to empty over --shield-duration. */
+@keyframes shield-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 button {
   -webkit-tap-highlight-color: transparent;
 }

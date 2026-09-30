@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { TOP_FLOOR } from '../game/levelData.js'
 import { HAZARD_TYPES } from '../game/hazards.js'
+import { POWERUP_TYPES, SHIELD_SECONDS } from '../game/powerups.js'
 import { selectFloor, useGame } from '../game/store.js'
 
 /* ------------------------------------------------------------------------------------------------
@@ -266,6 +267,31 @@ function DPad() {
   )
 }
 
+/** Pops in while a prayer/segula protects the parents, with a bar that drains over the shield time. */
+function ShieldIndicator() {
+  const shield = useGame((s) => s.shield)
+  const ref = useRef()
+  useLayoutEffect(() => {
+    if (!shield) return
+    const tween = gsap.fromTo(ref.current, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2.5)' })
+    return () => tween.kill()
+  }, [shield])
+  if (!shield) return null
+  const { label, color } = POWERUP_TYPES[shield.type]
+  return (
+    <div className="pointer-events-none absolute top-24 left-1/2 -translate-x-1/2 sm:top-6">
+      {/* keyed by pickup id so a second pickup restarts the drain animation */}
+      <div key={shield.id} ref={ref} className="overflow-hidden rounded-2xl bg-cream/90 shadow-md backdrop-blur">
+        <div className="px-4 pt-1.5 pb-1 text-center text-sm font-bold text-ink">{label} · אתם מוגנים!</div>
+        <div
+          className="h-1.5 origin-right"
+          style={{ background: color, animation: `shield-drain ${SHIELD_SECONDS}s linear forwards` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------------------------------------
  * HUD
  * --------------------------------------------------------------------------------------------- */
@@ -339,6 +365,7 @@ export default function UIOverlay() {
   return (
     <div dir="rtl" lang="he" className="pointer-events-none absolute inset-0 font-hebrew select-none">
       <HUD />
+      {phase === 'playing' && <ShieldIndicator />}
       {phase === 'intro' && <IntroScreen />}
       {phase === 'gameover' && <GameOverScreen key={`over-${runId}`} />}
       {phase === 'won' && <VictoryScreen key={`won-${runId}`} />}

@@ -7,6 +7,7 @@ import { useGame } from '../game/store.js'
 import LevelArchitecture from './LevelArchitecture.jsx'
 import Player from './Player.jsx'
 import HazardManager from './HazardManager.jsx'
+import PowerUpManager from './PowerUpManager.jsx'
 
 export const BACKGROUND = '#A3D9C9'
 
@@ -99,9 +100,10 @@ export default function Experience() {
       <group ref={world} position={WORLD_OFFSET}>
         <Ground />
         <LevelArchitecture />
-        {/* Keyed by run: a restart remounts both systems with a clean slate */}
+        {/* Keyed by run: a restart remounts these systems with a clean slate */}
         <Player key={`player-${runId}`} />
         <HazardManager key={`hazards-${runId}`} />
+        <PowerUpManager key={`powerups-${runId}`} />
       </group>
     </>
   )

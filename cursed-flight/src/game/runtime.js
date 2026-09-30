@@ -19,6 +19,10 @@ export const playerRuntime = {
   nextNode: null,
   /** Remaining queued nodes after `nextNode`. */
   queue: [],
+  /** Seconds of shield left from a prayer/segula pickup (0 = vulnerable). */
+  shield: 0,
+  /** Which pickup raised the shield ('prayer' | 'summon'); drives its colour. */
+  shieldType: null,
 }
 
 export function resetPlayerRuntime() {
@@ -26,4 +30,6 @@ export function resetPlayerRuntime() {
   playerRuntime.nextNode = null
   playerRuntime.queue = []
   playerRuntime.hitbox.makeEmpty()
+  playerRuntime.shield = 0
+  playerRuntime.shieldType = null
 }

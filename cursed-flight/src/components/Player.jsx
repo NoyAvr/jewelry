@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
@@ -7,6 +7,7 @@ import { edgeHeight, findPath, neighborInDirection } from '../game/navigation.js
 import { playerRuntime, resetPlayerRuntime } from '../game/runtime.js'
 import { useGame } from '../game/store.js'
 import { flatMaterial, UNIT_BOX } from '../game/materials.js'
+import { POWERUP_TYPES } from '../game/powerups.js'
 
 /* ------------------------------------------------------------------------------------------------
  * Tunables
@@ -25,6 +26,8 @@ const BOARDING_POINT = new THREE.Vector3(-1.4, 0, 0)
   .add(new THREE.Vector3(...PLANE_TRANSFORM.position))
 
 const SKIN = flatMaterial('#F1C7A5')
+
+const SHIELD_GEO = new THREE.SphereGeometry(0.85, 20, 14)
 
 /* ------------------------------------------------------------------------------------------------
  * The voxel parents
@@ -141,6 +144,11 @@ export default function Player() {
   const yawGroup = useRef() // facing direction
   const couple = useRef() // squash / shrink tweens
   const debugBox = useRef()
+  const shield = useRef() // glowing bubble while a prayer/segula protects them
+  const shieldMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    [],
+  )
   const motion = useRef({ walk: 0, phase: 0 })
   /**
    * Navigation state: walking along the edge `from → to` at progress `t`,
@@ -229,6 +237,7 @@ export default function Player() {
     const m = motion.current
 
     if (phase === 'boarding') {
+      shield.current.visible = false
       m.phase += dt * 11
       return
     }
@@ -287,7 +296,26 @@ export default function Player() {
     m.walk = THREE.MathUtils.damp(m.walk, moving ? 1 : 0, 10, dt)
     if (moving) m.phase += dt * 11
 
-    // 4. Publish hitbox + navigation for the hazard system.
+    // 4. Count down the prayer/segula shield and animate its bubble.
+    const bubble = shield.current
+    if (playerRuntime.shield > 0) {
+      playerRuntime.shield -= dt
+      const left = playerRuntime.shield
+      shieldMat.color.set(POWERUP_TYPES[playerRuntime.shieldType].color)
+      // Pulse gently; flicker during the last half-second as a warning.
+      shieldMat.opacity = left < 0.5 && Math.sin(left * 40) < 0 ? 0.08 : 0.28 + Math.sin(left * 8) * 0.06
+      bubble.visible = true
+      bubble.scale.setScalar(1 + Math.sin(left * 6) * 0.04)
+      if (left <= 0) {
+        playerRuntime.shield = 0
+        bubble.visible = false
+        useGame.getState().clearShield()
+      }
+    } else if (bubble.visible) {
+      bubble.visible = false
+    }
+
+    // 5. Publish hitbox + navigation for the hazard system.
     tmpCenter.set(pos.x, pos.y + HITBOX_SIZE.y / 2, pos.z)
     playerRuntime.position.copy(pos)
     playerRuntime.hitbox.setFromCenterAndSize(tmpCenter, HITBOX_SIZE)
@@ -308,6 +336,7 @@ export default function Player() {
             <Suitcase />
           </group>
         </group>
+        <mesh ref={shield} geometry={SHIELD_GEO} material={shieldMat} position={[0, 0.6, 0]} visible={false} />
       </group>
       {DEBUG && (
         <mesh ref={debugBox} scale={HITBOX_SIZE.toArray()}>

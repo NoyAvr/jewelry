@@ -21,6 +21,8 @@ export const useGame = create((set, get) => ({
   currentNode: START_NODE,
   /** Latest movement command; `id` makes identical commands distinct. */
   command: null,
+  /** Active protective shield for the HUD: { type, id } or null. */
+  shield: null,
 
   start: () => set({ phase: 'playing', startedAt: performance.now() }),
 
@@ -31,6 +33,7 @@ export const useGame = create((set, get) => ({
       cause: null,
       currentNode: START_NODE,
       command: null,
+      shield: null,
       startedAt: performance.now(),
     })),
 
@@ -48,6 +51,12 @@ export const useGame = create((set, get) => ({
 
   /** Called by Airplane when the take-off animation completes. */
   depart: () => get().phase === 'boarding' && set({ phase: 'won' }),
+
+  /** Called by PowerUpManager when the parents collect a prayer or segula. */
+  grantShield: (type) => set((s) => ({ shield: { type, id: (s.shield?.id ?? 0) + 1 } })),
+
+  /** Called by Player when the shield timer runs out. */
+  clearShield: () => get().shield && set({ shield: null }),
 
   setCurrentNode: (id) => get().currentNode !== id && set({ currentNode: id }),
 
