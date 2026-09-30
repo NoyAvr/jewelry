@@ -60,7 +60,7 @@ function Parent({ variant, motion, offset }) {
 
   const top = flatMaterial(isDad ? '#6C8EBF' : '#E98A7A')
   const bottom = flatMaterial(isDad ? '#3E4A61' : '#8C5E58')
-  const hair = flatMaterial(isDad ? '#C8CCD0' : '#5B3A2E')
+  const hair = flatMaterial(isDad ? '#1E1E22' : '#B08158')
 
   return (
     <group position={[offset, 0, 0]}>
