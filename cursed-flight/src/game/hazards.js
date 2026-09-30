@@ -1,37 +1,37 @@
 /**
  * The curses. Each hazard type has a collision radius, how wildly it tumbles
- * while falling, and the copy shown when it cancels the parents' flight.
+ * while falling, and the (Hebrew) copy shown when it cancels the parents' flight.
  */
 export const HAZARD_TYPES = {
   crab: {
     radius: 0.42,
     tumble: 1,
-    title: 'Crab Invasion',
-    reason: 'A marching army of crabs has occupied the runway.',
+    title: 'פלישת סרטנים',
+    reason: 'צבא של סרטנים השתלט על המסלול.',
   },
   missile: {
     radius: 0.34,
     tumble: 0,
-    title: 'Airspace Closed',
-    reason: 'War broke out overnight — all flights are grounded.',
+    title: 'המרחב האווירי נסגר',
+    reason: 'פרצה מלחמה בלילה, וכל הטיסות קורקעו.',
   },
   plane: {
     radius: 0.42,
     tumble: 0, // nose-dives in a tight spiral instead of tumbling
-    title: 'Airline Grounded',
-    reason: "A terrorist pilot attempted to crash a plane, and all of the airline's flights were cancelled.",
+    title: 'חברת התעופה קורקעה',
+    reason: 'טייס מחבל ניסה לרסק מטוס, וכל הטיסות של חברת התעופה בוטלו.',
   },
   tv: {
     radius: 0.42,
     tumble: 0.5,
-    title: 'Breaking News',
-    reason: 'The airline just announced a surprise strike. On live TV.',
+    title: 'מבזק חדשות',
+    reason: 'חברת התעופה הכריזה הרגע על שביתה פתאומית, בשידור חי.',
   },
   medkit: {
     radius: 0.38,
     tumble: 0.9,
-    title: 'Medical Emergency',
-    reason: 'A sudden medical emergency. The trip is postponed — again.',
+    title: 'מצב חירום רפואי',
+    reason: 'מקרה חירום רפואי פתאומי, והטיסה נדחתה שוב.',
   },
 }
 

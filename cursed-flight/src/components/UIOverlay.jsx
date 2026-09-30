@@ -13,7 +13,7 @@ function PrimaryButton({ children, onClick, autoFocus }) {
     <button
       autoFocus={autoFocus}
       onClick={onClick}
-      className="pointer-events-auto rounded-full bg-ink px-7 py-3 whitespace-nowrap font-display text-lg font-semibold tracking-wide text-cream shadow-[0_6px_0_#1c282e] transition hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-1 active:shadow-[0_2px_0_#1c282e] focus:outline-none focus-visible:ring-4 focus-visible:ring-sand"
+      className="pointer-events-auto rounded-full bg-ink px-7 py-3 whitespace-nowrap font-hebrew text-lg font-semibold tracking-wide text-cream shadow-[0_6px_0_#1c282e] transition hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-1 active:shadow-[0_2px_0_#1c282e] focus:outline-none focus-visible:ring-4 focus-visible:ring-sand"
     >
       {children}
     </button>
@@ -23,8 +23,8 @@ function PrimaryButton({ children, onClick, autoFocus }) {
 function Chip({ label, value }) {
   return (
     <div className="rounded-2xl bg-cream/80 px-3 py-1.5 text-center shadow-sm backdrop-blur">
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-soft">{label}</div>
-      <div className="font-display text-lg leading-tight font-semibold text-ink">{value}</div>
+      <div className="text-xs font-bold text-ink-soft">{label}</div>
+      <div className="font-hebrew text-lg leading-tight font-semibold text-ink">{value}</div>
     </div>
   )
 }
@@ -69,7 +69,7 @@ function Modal({ children, tone = 'cream' }) {
 function PassHeader({ color, label }) {
   return (
     <div className={`px-6 py-3 text-cream ${color}`}>
-      <span className="font-display text-sm font-semibold tracking-[0.25em] uppercase">{label}</span>
+      <span className="font-hebrew text-sm font-semibold tracking-wide">{label}</span>
     </div>
   )
 }
@@ -92,9 +92,8 @@ function IntroScreen() {
   const start = useGame((s) => s.start)
   return (
     <Modal>
-      <PassHeader color="bg-turquoise" label="Boarding pass" />
-      {/* Pre-game instructions in Hebrew (right-to-left) */}
-      <div dir="rtl" lang="he" className="px-7 pt-5 pb-7 text-right font-hebrew">
+      <PassHeader color="bg-turquoise" label="כרטיס עלייה למטוס" />
+      <div className="px-7 pt-5 pb-7">
         <h2 data-stagger className="text-3xl font-bold">
           קללת הטיסה
         </h2>
@@ -117,16 +116,16 @@ function IntroScreen() {
 function GameOverScreen() {
   const cause = useGame((s) => s.cause)
   const restart = useGame((s) => s.restart)
-  const hazard = HAZARD_TYPES[cause] ?? { title: 'Unknown curse', reason: 'Nobody knows what happened.' }
+  const hazard = HAZARD_TYPES[cause] ?? { title: 'קללה לא ידועה', reason: 'אף אחד לא יודע מה קרה.' }
   return (
     <Modal tone="danger">
-      <PassHeader color="bg-terracotta" label="Status update" />
+      <PassHeader color="bg-terracotta" label="עדכון סטטוס" />
       <div className="px-7 pt-5">
-        <p data-stagger className="text-xs font-bold tracking-[0.2em] text-terracotta uppercase">
+        <p data-stagger className="text-sm font-bold text-terracotta">
           {hazard.title}
         </p>
-        <h2 data-stagger className="mt-1 pr-36 font-display text-3xl font-bold">
-          Flight Canceled!
+        <h2 data-stagger className="mt-1 pl-32 font-hebrew text-3xl font-bold">
+          הטיסה בוטלה!
         </h2>
         <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
           {hazard.reason}
@@ -134,15 +133,15 @@ function GameOverScreen() {
       </div>
       <div
         data-stamp
-        className="pointer-events-none absolute top-[76px] right-5 rounded-lg border-4 border-terracotta px-2.5 py-0.5 font-display text-lg font-bold tracking-widest text-terracotta opacity-0"
+        className="pointer-events-none absolute top-[76px] left-5 rounded-lg border-4 border-terracotta px-3 py-0.5 font-hebrew text-xl font-bold text-terracotta opacity-0"
       >
-        CANCELED
+        בוטלה
       </div>
       <Perforation />
       <div className="flex justify-center px-7 pt-2 pb-7">
         <div data-stagger>
           <PrimaryButton onClick={restart} autoFocus>
-            Rebook &amp; retry
+            להזמין שוב ולנסות
           </PrimaryButton>
         </div>
       </div>
@@ -156,35 +155,35 @@ function VictoryScreen() {
   const restart = useGame((s) => s.restart)
   return (
     <Modal>
-      <PassHeader color="bg-mint-deep" label="Departed" />
+      <PassHeader color="bg-mint-deep" label="המריאה" />
       <div className="px-7 pt-5">
-        <h2 data-stagger className="pr-36 font-display text-3xl leading-tight font-bold">
-          Flight Departure Success!
+        <h2 data-stagger className="pl-32 font-hebrew text-3xl leading-tight font-bold">
+          הטיסה המריאה בהצלחה!
         </h2>
         <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
-          Mom &amp; Dad are finally in the air. The curse is broken — for now.
+          אמא ואבא סוף סוף באוויר. הקללה נשברה, לפחות בינתיים.
         </p>
       </div>
       <div
         data-stamp
-        className="pointer-events-none absolute top-[76px] right-5 rounded-lg border-4 border-mint-deep px-2.5 py-0.5 font-display text-lg font-bold tracking-widest text-mint-deep opacity-0"
+        className="pointer-events-none absolute top-[76px] left-5 rounded-lg border-4 border-mint-deep px-3 py-0.5 font-hebrew text-xl font-bold text-mint-deep opacity-0"
       >
-        ON TIME
+        בזמן
       </div>
       <Perforation />
       <div className="grid grid-cols-2 gap-4 px-7">
         <div data-stagger>
-          <div className="text-[10px] font-bold tracking-[0.2em] text-ink-soft uppercase">Climb time</div>
-          <div className="font-display text-2xl font-semibold">{time.toFixed(1)}s</div>
+          <div className="text-xs font-bold text-ink-soft">זמן טיפוס</div>
+          <div className="font-hebrew text-2xl font-semibold">{time.toFixed(1)} שניות</div>
         </div>
         <div data-stagger>
-          <div className="text-[10px] font-bold tracking-[0.2em] text-ink-soft uppercase">Cancellations</div>
-          <div className="font-display text-2xl font-semibold">{cancellations}</div>
+          <div className="text-xs font-bold text-ink-soft">ביטולים</div>
+          <div className="font-hebrew text-2xl font-semibold">{cancellations}</div>
         </div>
       </div>
       <div data-stagger className="flex justify-center px-7 pt-6 pb-7">
         <PrimaryButton onClick={restart} autoFocus>
-          Fly again
+          לטוס שוב
         </PrimaryButton>
       </div>
     </Modal>
@@ -223,10 +222,10 @@ function useKeyboardControls() {
 }
 
 const PAD = [
-  { dir: 'upLeft', label: 'Step up-left', rotate: '-45deg' },
-  { dir: 'upRight', label: 'Step up-right', rotate: '45deg' },
-  { dir: 'downLeft', label: 'Step down-left', rotate: '-135deg' },
-  { dir: 'downRight', label: 'Step down-right', rotate: '135deg' },
+  { dir: 'upLeft', label: 'צעד למעלה שמאלה', rotate: '-45deg' },
+  { dir: 'upRight', label: 'צעד למעלה ימינה', rotate: '45deg' },
+  { dir: 'downLeft', label: 'צעד למטה שמאלה', rotate: '-135deg' },
+  { dir: 'downRight', label: 'צעד למטה ימינה', rotate: '135deg' },
 ]
 
 function PadButton({ dir, label, rotate }) {
@@ -257,8 +256,9 @@ function PadButton({ dir, label, rotate }) {
 }
 
 function DPad() {
+  // The arrows point along screen diagonals, so the pad keeps a left-to-right layout inside the RTL UI.
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div dir="ltr" className="grid grid-cols-2 gap-2">
       {PAD.map((p) => (
         <PadButton key={p.dir} {...p} />
       ))}
@@ -288,19 +288,19 @@ function HUD() {
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
       <header className="flex items-start justify-between gap-3">
         <div data-hud className="max-w-xs">
-          <h1 className="font-display text-xl font-bold tracking-tight text-ink sm:text-3xl">Cursed Flight</h1>
+          <h1 className="font-hebrew text-xl font-bold tracking-tight text-ink sm:text-3xl">קללת הטיסה</h1>
           <p className="mt-0.5 text-xs font-semibold text-ink-soft sm:text-sm">
-            Guide your parents to the plane! Avoid the falling curses!
+            הובילו את ההורים למטוס! התחמקו מהקללות הנופלות!
           </p>
         </div>
         <div data-hud className="flex items-start gap-2">
-          <Chip label="Floor" value={`${floor}/${TOP_FLOOR}`} />
-          <Chip label="Canceled" value={cancellations} />
+          <Chip label="קומה" value={`${floor}/${TOP_FLOOR}`} />
+          <Chip label="בוטלו" value={cancellations} />
           <button
             onClick={restart}
             disabled={phase === 'intro'}
-            aria-label="Restart"
-            title="Restart (R)"
+            aria-label="התחלה מחדש"
+            title="התחלה מחדש (R)"
             className="pointer-events-auto flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-ink text-cream shadow-[0_4px_0_#1c282e] transition hover:bg-ink-soft active:translate-y-0.5 active:shadow-none disabled:opacity-40"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -311,9 +311,10 @@ function HUD() {
         </div>
       </header>
 
-      <footer className="flex items-end justify-between gap-3">
-        <p data-hud className="hidden rounded-full bg-cream/70 px-4 py-2 text-xs font-semibold text-ink-soft backdrop-blur sm:block">
-          Click a tile to walk · Arrows / WASD to step · R to restart
+      {/* dir="ltr" keeps the D-pad bottom-right (thumb side); the hint text itself stays RTL. */}
+      <footer dir="ltr" className="flex items-end justify-between gap-3">
+        <p data-hud dir="rtl" className="hidden rounded-full bg-cream/70 px-4 py-2 text-xs font-semibold text-ink-soft backdrop-blur sm:block">
+          לחצו על משבצת כדי ללכת · חיצים / WASD לצעד אחד · R להתחלה מחדש
         </p>
         {/* GSAP owns the outer div's inline opacity; the inner one fades with the game phase. */}
         <div data-hud className="ml-auto">
@@ -336,7 +337,7 @@ export default function UIOverlay() {
   useKeyboardControls()
 
   return (
-    <div className="pointer-events-none absolute inset-0 select-none">
+    <div dir="rtl" lang="he" className="pointer-events-none absolute inset-0 font-hebrew select-none">
       <HUD />
       {phase === 'intro' && <IntroScreen />}
       {phase === 'gameover' && <GameOverScreen key={`over-${runId}`} />}
