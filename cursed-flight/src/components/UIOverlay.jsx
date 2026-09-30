@@ -117,7 +117,6 @@ function IntroScreen() {
 
 function GameOverScreen() {
   const cause = useGame((s) => s.cause)
-  const cancellations = useGame((s) => s.cancellations)
   const restart = useGame((s) => s.restart)
   const hazard = HAZARD_TYPES[cause] ?? { title: 'Unknown curse', reason: 'Nobody knows what happened.' }
   return (
@@ -141,13 +140,7 @@ function GameOverScreen() {
         CANCELED
       </div>
       <Perforation />
-      <div className="flex items-center justify-between gap-4 px-7 pb-7">
-        <div data-stagger>
-          <div className="text-[10px] font-bold tracking-[0.2em] text-ink-soft uppercase">Curse count</div>
-          <div className="font-display text-2xl font-semibold whitespace-nowrap">
-            {cancellations} {cancellations === 1 ? 'flight' : 'flights'}
-          </div>
-        </div>
+      <div className="flex justify-center px-7 pt-2 pb-7">
         <div data-stagger>
           <PrimaryButton onClick={restart} autoFocus>
             Rebook &amp; retry
