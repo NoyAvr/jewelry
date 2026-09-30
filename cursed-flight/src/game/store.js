@@ -7,7 +7,8 @@ import { LEVELS, NODES, setLevel, START_NODE } from './levelData.js'
  *
  * Phases: intro → playing → (gameover | boarding → won)
  * After winning, nextLevel() moves on; after the last level, playAgain() starts over.
- * askQuit() pauses play ('paused') until resume() or quit(), which goes back to the intro at level 1.
+ * pause() stops play ('paused') until resume(); askQuit() pauses to confirm quit(), which goes
+ * back to the intro at level 1. `pauseReason` says which card to show ('stop' | 'quit').
  */
 export const useGame = create((set, get) => ({
   phase: 'intro',
@@ -41,8 +42,18 @@ export const useGame = create((set, get) => ({
   /** Starts the whole journey over from level 1. */
   playAgain: () => get().loadLevel(0),
 
+  /** Why the game is paused: 'stop' (the player paused it) or 'quit' (confirming exit). */
+  pauseReason: null,
+
+  /** Pauses the game (or switches an existing pause to another reason). */
+  pause: (reason = 'stop') => {
+    const { phase } = get()
+    if (phase === 'playing') set({ phase: 'paused', pauseReason: reason, pausedAt: performance.now() })
+    else if (phase === 'paused') set({ pauseReason: reason })
+  },
+
   /** Pauses the game while the player confirms quitting. */
-  askQuit: () => get().phase === 'playing' && set({ phase: 'paused', pausedAt: performance.now() }),
+  askQuit: () => get().pause('quit'),
 
   /** Closes the quit prompt; the pause doesn't count towards the climb time. */
   resume: () =>

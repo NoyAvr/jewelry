@@ -24,7 +24,7 @@ hazard collisions.
 - **Arrow keys / WASD** or the on-screen diamond pad — step one node. The keys map to the
   isometric diagonals: ↑ up-right, → down-right, ↓ down-left, ← up-left. Press the opposite
   direction mid-step to turn around.
-- **R** restarts the current level. **Esc** (or the door button) pauses and offers to quit back to the start screen at level 1.
+- **אפשרויות** (the menu button in the top bar) offers עצירה (pause), התחלה מחדש (restart the level) and יציאה (quit to the start screen at level 1, after a confirmation). **Esc** pauses/resumes and **R** restarts.
 
 ## Architecture
 

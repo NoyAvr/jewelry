@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { LEVELS, TOP_FLOOR } from '../game/levelData.js'
 import { HAZARD_TYPES } from '../game/hazards.js'
@@ -215,23 +215,53 @@ function VictoryScreen() {
   )
 }
 
-/** Confirms quitting while the game is paused; quitting goes back to the start at level 1. */
-function QuitScreen() {
+/**
+ * Shown while the game is paused: either a plain "stopped" card (resume / restart / exit),
+ * or the exit confirmation. Exiting goes back to the start screen at level 1.
+ */
+function PauseScreen() {
+  const reason = useGame((s) => s.pauseReason)
   const resume = useGame((s) => s.resume)
+  const restart = useGame((s) => s.restart)
+  const askQuit = useGame((s) => s.askQuit)
   const quit = useGame((s) => s.quit)
+
+  if (reason === 'quit') {
+    return (
+      <Modal key="quit">
+        <PassHeader color="bg-ink-soft" label="המשחק מושהה" />
+        <div className="px-7 pt-5 pb-7">
+          <h2 data-stagger className="font-hebrew text-3xl font-bold">
+            לצאת מהמשחק?
+          </h2>
+          <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
+            תחזרו למסך הפתיחה, וההתקדמות תתאפס: המסע יתחיל מחדש משלב 1.
+          </p>
+          <div data-stagger className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <PrimaryButton onClick={quit}>כן, לצאת</PrimaryButton>
+            <SecondaryButton onClick={resume}>להמשיך לשחק</SecondaryButton>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
-    <Modal>
-      <PassHeader color="bg-ink-soft" label="המשחק מושהה" />
+    <Modal key="stop">
+      <PassHeader color="bg-ink-soft" label="המשחק נעצר" />
       <div className="px-7 pt-5 pb-7">
         <h2 data-stagger className="font-hebrew text-3xl font-bold">
-          לצאת מהמשחק?
+          הפסקה קצרה
         </h2>
         <p data-stagger className="mt-2 leading-relaxed text-ink-soft">
-          תחזרו למסך הפתיחה, וההתקדמות תתאפס: המסע יתחיל מחדש משלב 1.
+          הקללות קפאו באוויר. אפשר להמשיך מאותה נקודה בדיוק.
         </p>
         <div data-stagger className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <PrimaryButton onClick={quit}>כן, לצאת</PrimaryButton>
-          <SecondaryButton onClick={resume}>להמשיך לשחק</SecondaryButton>
+          <PrimaryButton onClick={resume} autoFocus>
+            להמשיך לשחק
+          </PrimaryButton>
+          <SecondaryButton onClick={restart}>התחלה מחדש</SecondaryButton>
+          <SecondaryButton onClick={askQuit}>יציאה מהמשחק</SecondaryButton>
         </div>
       </div>
     </Modal>
@@ -257,9 +287,9 @@ const KEYMAP = {
 function useKeyboardControls() {
   useEffect(() => {
     const onKey = (e) => {
-      const { phase, issueCommand, restart, askQuit, resume } = useGame.getState()
-      // Escape opens the quit prompt, and closes it again.
-      if (e.code === 'Escape') return phase === 'paused' ? resume() : askQuit()
+      const { phase, issueCommand, restart, pause, resume } = useGame.getState()
+      // Escape stops the game, and resumes it again.
+      if (e.code === 'Escape') return phase === 'paused' ? resume() : pause()
       if (phase === 'paused') return
       if (e.code === 'KeyR' && phase !== 'intro') return restart()
       const dir = KEYMAP[e.code]
@@ -375,6 +405,134 @@ function FalseAlarmToast() {
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * Options menu: stop, restart or exit
+ * --------------------------------------------------------------------------------------------- */
+
+const ICON_PROPS = {
+  width: 20,
+  height: 20,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2.4,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+}
+
+const OPTION_ITEMS = [
+  {
+    id: 'stop',
+    label: 'עצירה',
+    hint: 'Esc',
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M9 5v14M15 5v14" />
+      </svg>
+    ),
+  },
+  {
+    id: 'restart',
+    label: 'התחלה מחדש',
+    hint: 'R',
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M3 12a9 9 0 1 0 3-6.7" />
+        <path d="M3 4v5h5" />
+      </svg>
+    ),
+  },
+  {
+    id: 'exit',
+    label: 'יציאה מהמשחק',
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+        <path d="M9 8l-4 4 4 4" />
+        <path d="M5 12h10" />
+      </svg>
+    ),
+  },
+]
+
+/** "אפשרויות" button that drops down a menu to stop, restart or exit the game. */
+function OptionsMenu() {
+  const [open, setOpen] = useState(false)
+  const phase = useGame((s) => s.phase)
+  const menu = useRef()
+  const container = useRef()
+  const enabled = phase === 'playing'
+
+  // A press anywhere outside the button + menu closes it. (A full-screen catcher element
+  // wouldn't work here: the HUD's GSAP transform makes `position: fixed` local to the header.)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => {
+      if (!container.current?.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [open])
+
+  // Close when the game leaves normal play (e.g. game over) while the menu is open.
+  useEffect(() => {
+    if (!enabled) setOpen(false)
+  }, [enabled])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const tween = gsap.fromTo(menu.current, { y: -8, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: 'power2.out' })
+    return () => tween.kill()
+  }, [open])
+
+  const choose = (id) => {
+    setOpen(false)
+    const { pause, restart, askQuit } = useGame.getState()
+    if (id === 'stop') pause()
+    if (id === 'restart') restart()
+    if (id === 'exit') askQuit()
+  }
+
+  return (
+    <div ref={container} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        disabled={!enabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="pointer-events-auto flex h-[52px] items-center gap-2 rounded-2xl bg-ink px-4 text-cream shadow-[0_4px_0_#1c282e] transition hover:bg-ink-soft active:translate-y-0.5 active:shadow-none disabled:opacity-40"
+      >
+        {/* Three-line "menu" glyph */}
+        <svg {...ICON_PROPS}>
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+        <span className="hidden text-sm font-bold sm:inline">אפשרויות</span>
+      </button>
+      {open && (
+        <div
+          ref={menu}
+          role="menu"
+          className="pointer-events-auto absolute top-full left-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl bg-cream py-1.5 text-ink shadow-[0_16px_40px_-12px_rgba(47,62,70,0.5)]"
+        >
+          {OPTION_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              role="menuitem"
+              onClick={() => choose(item.id)}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-right font-semibold transition hover:bg-mint/40 focus:bg-mint/40 focus:outline-none"
+            >
+              <span className="text-ink-soft">{item.icon}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.hint && <span className="text-xs font-bold text-ink-soft/70" dir="ltr">{item.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------------------------------------
  * HUD
  * --------------------------------------------------------------------------------------------- */
 
@@ -384,8 +542,6 @@ function HUD() {
   const floor = useGame(selectFloor)
   const level = useGame((s) => s.level)
   const cancellations = useGame((s) => s.cancellations)
-  const restart = useGame((s) => s.restart)
-  const askQuit = useGame((s) => s.askQuit)
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -407,39 +563,14 @@ function HUD() {
           <Chip label="שלב" value={`${level + 1}/${LEVELS.length}`} />
           <Chip label="קומה" value={`${floor}/${TOP_FLOOR}`} />
           <Chip label="בוטלו" value={cancellations} />
-          <button
-            onClick={restart}
-            disabled={phase === 'intro'}
-            aria-label="התחלה מחדש"
-            title="התחלה מחדש (R)"
-            className="pointer-events-auto flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-ink text-cream shadow-[0_4px_0_#1c282e] transition hover:bg-ink-soft active:translate-y-0.5 active:shadow-none disabled:opacity-40"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M3 12a9 9 0 1 0 3-6.7" />
-              <path d="M3 4v5h5" />
-            </svg>
-          </button>
-          <button
-            onClick={askQuit}
-            disabled={phase !== 'playing'}
-            aria-label="יציאה מהמשחק"
-            title="יציאה מהמשחק (Esc)"
-            className="pointer-events-auto flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-cream/85 text-ink shadow-[0_4px_0_rgba(47,62,70,0.25)] backdrop-blur transition hover:bg-cream active:translate-y-0.5 active:shadow-none disabled:opacity-40"
-          >
-            {/* Door with an arrow leading out */}
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
-              <path d="M9 8l-4 4 4 4" />
-              <path d="M5 12h10" />
-            </svg>
-          </button>
+          <OptionsMenu />
         </div>
       </header>
 
       {/* dir="ltr" keeps the D-pad bottom-right (thumb side); the hint text itself stays RTL. */}
       <footer dir="ltr" className="flex items-end justify-between gap-3">
         <p data-hud dir="rtl" className="hidden rounded-full bg-cream/70 px-4 py-2 text-xs font-semibold text-ink-soft backdrop-blur sm:block">
-          לחצו על משבצת כדי ללכת · חיצים / WASD לצעד אחד · R להתחלה מחדש · Esc ליציאה
+          לחצו על משבצת כדי ללכת · חיצים / WASD לצעד אחד · R להתחלה מחדש · Esc לעצירה
         </p>
         {/* GSAP owns the outer div's inline opacity; the inner one fades with the game phase. */}
         <div data-hud className="ml-auto">
@@ -469,7 +600,7 @@ export default function UIOverlay() {
       {phase === 'intro' && <IntroScreen />}
       {phase === 'gameover' && <GameOverScreen key={`over-${runId}`} />}
       {phase === 'won' && <VictoryScreen key={`won-${runId}`} />}
-      {phase === 'paused' && <QuitScreen />}
+      {phase === 'paused' && <PauseScreen />}
     </div>
   )
 }
