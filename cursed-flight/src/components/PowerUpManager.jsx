@@ -36,16 +36,39 @@ const CRYSTAL_MAT = new THREE.MeshStandardMaterial({
 })
 const CRYSTAL_GEO = new THREE.OctahedronGeometry(0.2, 0)
 
-/** A small leather-bound Bible with a gold cross — a prayer. */
-function BibleModel() {
+const GOLD = flatMaterial('#F6C453')
+const WOOD = flatMaterial('#8B5A2B')
+/** One triangle of the Star of David: a thin 3-sided prism. */
+const TRIANGLE_GEO = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 3)
+
+/** A Torah scroll in a velvet mantle with a gold Star of David — a prayer. */
+function TorahModel() {
   return (
-    <group rotation={[0.35, 0, 0.15]}>
-      <mesh geometry={UNIT_BOX} material={flatMaterial('#6B3E2E')} scale={[0.46, 0.13, 0.36]} castShadow />
-      <mesh geometry={UNIT_BOX} material={flatMaterial('#FFF4DC')} scale={[0.42, 0.09, 0.37]} position={[0.03, 0, 0]} />
-      <mesh geometry={UNIT_BOX} material={flatMaterial('#F6C453')} scale={[0.05, 0.02, 0.2]} position={[-0.02, 0.07, 0]} />
-      <mesh geometry={UNIT_BOX} material={flatMaterial('#F6C453')} scale={[0.14, 0.02, 0.05]} position={[-0.02, 0.07, -0.04]} />
-      {/* Ribbon bookmark */}
-      <mesh geometry={UNIT_BOX} material={flatMaterial('#E85D4A')} scale={[0.03, 0.12, 0.02]} position={[0.1, -0.08, 0.18]} />
+    <group>
+      {/* Mantle covering the scroll */}
+      <mesh geometry={UNIT_BOX} material={flatMaterial('#2B4C8C')} scale={[0.38, 0.36, 0.22]} castShadow />
+      <mesh geometry={UNIT_BOX} material={GOLD} scale={[0.39, 0.03, 0.23]} position={[0, -0.15, 0]} />
+      {/* Wooden rollers (atzei chaim) poking out top and bottom, with gold crowns */}
+      {[-0.1, 0.1].map((x) => (
+        <group key={x}>
+          <mesh material={WOOD} position={[x, 0.25, 0]} castShadow>
+            <cylinderGeometry args={[0.03, 0.03, 0.14, 6]} />
+          </mesh>
+          <mesh material={GOLD} position={[x, 0.34, 0]} castShadow>
+            <sphereGeometry args={[0.045, 8, 6]} />
+          </mesh>
+          <mesh material={WOOD} position={[x, -0.23, 0]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.1, 6]} />
+          </mesh>
+        </group>
+      ))}
+      {/* Star of David on both faces: two overlapping triangles, one turned 60° */}
+      {[0.115, -0.115].map((z) => (
+        <group key={z} position={[0, 0.02, z]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh geometry={TRIANGLE_GEO} material={GOLD} rotation={[0, Math.PI / 2, 0]} />
+          <mesh geometry={TRIANGLE_GEO} material={GOLD} rotation={[0, Math.PI / 2 + Math.PI / 3, 0]} />
+        </group>
+      ))}
     </group>
   )
 }
@@ -61,7 +84,7 @@ function CrystalModel() {
   )
 }
 
-const MODELS = { prayer: BibleModel, summon: CrystalModel }
+const MODELS = { prayer: TorahModel, summon: CrystalModel }
 const HALO_GEO = new THREE.RingGeometry(0.42, 0.56, 24).rotateX(-Math.PI / 2)
 
 /* ------------------------------------------------------------------------------------------------
