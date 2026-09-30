@@ -552,13 +552,8 @@ function HUD() {
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
-      <header className="flex items-start justify-between gap-3">
-        <div data-hud className="max-w-xs">
-          <h1 className="font-hebrew text-xl font-bold tracking-tight text-ink sm:text-3xl">קללת הטיסה</h1>
-          <p className="mt-0.5 text-xs font-semibold text-ink-soft sm:text-sm">
-            הובילו את ההורים למטוס! התחמקו מהקללות הנופלות!
-          </p>
-        </div>
+      {/* justify-end keeps the counters + options on the left in this RTL layout */}
+      <header className="flex items-start justify-end gap-3">
         <div data-hud className="flex items-start gap-2">
           <Chip label="שלב" value={`${level + 1}/${LEVELS.length}`} />
           <Chip label="קומה" value={`${floor}/${TOP_FLOOR}`} />
