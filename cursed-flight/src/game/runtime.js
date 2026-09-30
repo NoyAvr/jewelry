@@ -23,6 +23,8 @@ export const playerRuntime = {
   shield: 0,
   /** Which pickup raised the shield ('prayer' | 'summon'); drives its colour. */
   shieldType: null,
+  /** Seconds of grace left after a false alarm (0 = vulnerable). */
+  grace: 0,
 }
 
 export function resetPlayerRuntime() {
@@ -32,4 +34,5 @@ export function resetPlayerRuntime() {
   playerRuntime.hitbox.makeEmpty()
   playerRuntime.shield = 0
   playerRuntime.shieldType = null
+  playerRuntime.grace = 0
 }

@@ -23,6 +23,8 @@ export const useGame = create((set, get) => ({
   command: null,
   /** Active protective shield for the HUD: { type, id } or null. */
   shield: null,
+  /** Latest false alarm for the HUD toast: { type, id } or null. */
+  falseAlarm: null,
 
   start: () => set({ phase: 'playing', startedAt: performance.now() }),
 
@@ -34,6 +36,7 @@ export const useGame = create((set, get) => ({
       currentNode: START_NODE,
       command: null,
       shield: null,
+      falseAlarm: null,
       startedAt: performance.now(),
     })),
 
@@ -57,6 +60,12 @@ export const useGame = create((set, get) => ({
 
   /** Called by Player when the shield timer runs out. */
   clearShield: () => get().shield && set({ shield: null }),
+
+  /** Called by HazardManager when a curse hits but the flight goes ahead anyway. */
+  raiseFalseAlarm: (type) => set((s) => ({ falseAlarm: { type, id: (s.falseAlarm?.id ?? 0) + 1 } })),
+
+  /** Hides the toast, unless a newer false alarm has replaced it meanwhile. */
+  clearFalseAlarm: (id) => get().falseAlarm?.id === id && set({ falseAlarm: null }),
 
   setCurrentNode: (id) => get().currentNode !== id && set({ currentNode: id }),
 

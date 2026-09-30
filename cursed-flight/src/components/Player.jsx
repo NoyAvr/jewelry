@@ -236,6 +236,7 @@ export default function Player() {
     const { phase } = useGame.getState()
     const m = motion.current
 
+    if (phase !== 'playing') couple.current.visible = true // never leave them mid-flicker
     if (phase === 'boarding') {
       shield.current.visible = false
       m.phase += dt * 11
@@ -296,7 +297,13 @@ export default function Player() {
     m.walk = THREE.MathUtils.damp(m.walk, moving ? 1 : 0, 10, dt)
     if (moving) m.phase += dt * 11
 
-    // 4. Count down the prayer/summon shield and animate its bubble.
+    // 4. After a false alarm the parents flicker briefly while they can't be hit.
+    if (playerRuntime.grace > 0) {
+      playerRuntime.grace = Math.max(playerRuntime.grace - dt, 0)
+      couple.current.visible = playerRuntime.grace === 0 || Math.sin(playerRuntime.grace * 40) > 0
+    }
+
+    // 5. Count down the prayer/summon shield and animate its bubble.
     const bubble = shield.current
     if (playerRuntime.shield > 0) {
       playerRuntime.shield -= dt
@@ -315,7 +322,7 @@ export default function Player() {
       bubble.visible = false
     }
 
-    // 5. Publish hitbox + navigation for the hazard system.
+    // 6. Publish hitbox + navigation for the hazard system.
     tmpCenter.set(pos.x, pos.y + HITBOX_SIZE.y / 2, pos.z)
     playerRuntime.position.copy(pos)
     playerRuntime.hitbox.setFromCenterAndSize(tmpCenter, HITBOX_SIZE)

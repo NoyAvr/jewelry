@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GOAL_NODE, NODES } from '../game/levelData.js'
-import { HAZARD_KEYS, HAZARD_TYPES } from '../game/hazards.js'
+import { FALSE_ALARM_CHANCE, FALSE_ALARM_GRACE, HAZARD_KEYS, HAZARD_TYPES } from '../game/hazards.js'
 import { nodesWithin } from '../game/navigation.js'
 import { playerRuntime } from '../game/runtime.js'
 import { useGame } from '../game/store.js'
@@ -168,7 +168,7 @@ export default function HazardManager() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
-    const { phase, cancelFlight, currentNode } = useGame.getState()
+    const { phase, cancelFlight, raiseFalseAlarm, currentNode } = useGame.getState()
     // Nothing falls before the game starts; everything freezes dramatically on Game Over.
     if (phase === 'intro' || phase === 'gameover') return
 
@@ -226,10 +226,18 @@ export default function HazardManager() {
 
       // --- Collision: hazard bounding sphere vs the parents' hitbox ---
       const lethal = h.state === 'falling' || h.age < IMPACT_LETHAL_TIME
-      // A prayer/summon shield lets curses pass straight through the parents.
-      if (phase === 'playing' && lethal && !INVINCIBLE && playerRuntime.shield <= 0) {
+      // A prayer/summon shield (or post-false-alarm grace) lets curses pass straight through.
+      const protectedNow = playerRuntime.shield > 0 || playerRuntime.grace > 0
+      if (phase === 'playing' && lethal && !INVINCIBLE && !protectedNow) {
         sphere.set(v.body.position, radius)
         if (sphere.intersectsBox(playerRuntime.hitbox)) {
+          if (Math.random() < FALSE_ALARM_CHANCE) {
+            // False alarm: the curse fizzles out and the flight is still on.
+            playerRuntime.grace = FALSE_ALARM_GRACE
+            raiseFalseAlarm(h.type)
+            retire(h, v)
+            continue
+          }
           cancelFlight(h.type)
           return
         }

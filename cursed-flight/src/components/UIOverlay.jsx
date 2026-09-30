@@ -292,6 +292,36 @@ function ShieldIndicator() {
   )
 }
 
+const FALSE_ALARM_TOAST_MS = 3500
+
+/** Toast shown when a curse hits but turns out to be a false alarm. */
+function FalseAlarmToast() {
+  const alarm = useGame((s) => s.falseAlarm)
+  const ref = useRef()
+  useLayoutEffect(() => {
+    if (!alarm) return
+    const tween = gsap.fromTo(ref.current, { y: -16, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(2)' })
+    const timer = setTimeout(() => useGame.getState().clearFalseAlarm(alarm.id), FALSE_ALARM_TOAST_MS)
+    return () => {
+      tween.kill()
+      clearTimeout(timer)
+    }
+  }, [alarm])
+  if (!alarm) return null
+  return (
+    <div className="pointer-events-none absolute top-40 right-4 left-4 flex justify-center sm:top-24">
+      <div
+        key={alarm.id}
+        ref={ref}
+        className="max-w-sm rounded-2xl border-2 border-mint-deep bg-cream/95 px-5 py-3 text-center shadow-lg backdrop-blur"
+      >
+        <div className="text-lg font-bold text-mint-deep">אזעקת שווא!</div>
+        <div className="mt-0.5 text-sm font-semibold text-ink">{HAZARD_TYPES[alarm.type].falseAlarm}</div>
+      </div>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------------------------------------
  * HUD
  * --------------------------------------------------------------------------------------------- */
@@ -366,6 +396,7 @@ export default function UIOverlay() {
     <div dir="rtl" lang="he" className="pointer-events-none absolute inset-0 font-hebrew select-none">
       <HUD />
       {phase === 'playing' && <ShieldIndicator />}
+      {phase === 'playing' && <FalseAlarmToast />}
       {phase === 'intro' && <IntroScreen />}
       {phase === 'gameover' && <GameOverScreen key={`over-${runId}`} />}
       {phase === 'won' && <VictoryScreen key={`won-${runId}`} />}
