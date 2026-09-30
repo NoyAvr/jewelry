@@ -226,7 +226,7 @@ export default function HazardManager() {
 
       // --- Collision: hazard bounding sphere vs the parents' hitbox ---
       const lethal = h.state === 'falling' || h.age < IMPACT_LETHAL_TIME
-      // A prayer/segula shield lets curses pass straight through the parents.
+      // A prayer/summon shield lets curses pass straight through the parents.
       if (phase === 'playing' && lethal && !INVINCIBLE && playerRuntime.shield <= 0) {
         sphere.set(v.body.position, radius)
         if (sphere.intersectsBox(playerRuntime.hitbox)) {

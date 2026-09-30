@@ -144,7 +144,7 @@ export default function Player() {
   const yawGroup = useRef() // facing direction
   const couple = useRef() // squash / shrink tweens
   const debugBox = useRef()
-  const shield = useRef() // glowing bubble while a prayer/segula protects them
+  const shield = useRef() // glowing bubble while a prayer/summon protects them
   const shieldMat = useMemo(
     () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
     [],
@@ -296,7 +296,7 @@ export default function Player() {
     m.walk = THREE.MathUtils.damp(m.walk, moving ? 1 : 0, 10, dt)
     if (moving) m.phase += dt * 11
 
-    // 4. Count down the prayer/segula shield and animate its bubble.
+    // 4. Count down the prayer/summon shield and animate its bubble.
     const bubble = shield.current
     if (playerRuntime.shield > 0) {
       playerRuntime.shield -= dt

@@ -50,7 +50,7 @@ function BibleModel() {
   )
 }
 
-/** A cluster of glowing crystals — a segula (protective charm). */
+/** A cluster of glowing crystals — a summon. */
 function CrystalModel() {
   return (
     <group>

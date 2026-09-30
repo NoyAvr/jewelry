@@ -38,7 +38,7 @@ src/
 │   ├── Player.jsx              The voxel parents, waypoint movement, walk cycle, hitbox
 │   ├── HazardManager.jsx       Pooled spawner, falling physics, warning rings, collision
 │   ├── HazardModels.jsx        Crab, missile, crashing plane, TV, medkit
-│   ├── PowerUpManager.jsx      Prayer (Bible) and segula (crystal) drops that grant a short shield
+│   ├── PowerUpManager.jsx      Prayer (Bible) and summon (crystal) drops that grant a short shield
 │   └── UIOverlay.jsx           Tailwind HUD, D-pad, Start / Game Over / Victory cards (GSAP)
 └── game/
     ├── levelData.js            Nodes, edges, palette: the single source of truth for the level

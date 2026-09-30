@@ -52,7 +52,7 @@ export const useGame = create((set, get) => ({
   /** Called by Airplane when the take-off animation completes. */
   depart: () => get().phase === 'boarding' && set({ phase: 'won' }),
 
-  /** Called by PowerUpManager when the parents collect a prayer or segula. */
+  /** Called by PowerUpManager when the parents collect a prayer or summon. */
   grantShield: (type) => set((s) => ({ shield: { type, id: (s.shield?.id ?? 0) + 1 } })),
 
   /** Called by Player when the shield timer runs out. */

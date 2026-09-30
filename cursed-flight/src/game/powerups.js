@@ -2,7 +2,7 @@
  * Protective drops. Walking onto one wraps the parents in a shield that lets
  * curses pass through them harmlessly for a short time.
  */
-export const SHIELD_SECONDS = 2.5
+export const SHIELD_SECONDS = 5
 
 export const POWERUP_TYPES = {
   prayer: {
@@ -10,7 +10,7 @@ export const POWERUP_TYPES = {
     color: '#F6C453', // shield + halo colour (warm gold)
   },
   summon: {
-    label: 'סגולה',
+    label: 'זימון',
     color: '#A98BFF', // crystal lavender
   },
 }

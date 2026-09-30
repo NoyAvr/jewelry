@@ -19,7 +19,7 @@ export const playerRuntime = {
   nextNode: null,
   /** Remaining queued nodes after `nextNode`. */
   queue: [],
-  /** Seconds of shield left from a prayer/segula pickup (0 = vulnerable). */
+  /** Seconds of shield left from a prayer/summon pickup (0 = vulnerable). */
   shield: 0,
   /** Which pickup raised the shield ('prayer' | 'summon'); drives its colour. */
   shieldType: null,

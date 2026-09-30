@@ -267,7 +267,7 @@ function DPad() {
   )
 }
 
-/** Pops in while a prayer/segula protects the parents, with a bar that drains over the shield time. */
+/** Pops in while a prayer/summon protects the parents, with a bar that drains over the shield time. */
 function ShieldIndicator() {
   const shield = useGame((s) => s.shield)
   const ref = useRef()
