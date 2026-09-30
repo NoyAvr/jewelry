@@ -237,11 +237,10 @@ function Tree({ x, z, s }) {
  * Interaction: invisible hit pads on every node + hover/target markers
  * --------------------------------------------------------------------------------------------- */
 
-const MARKER_GEO = new THREE.CircleGeometry(0.16, 16).rotateX(-Math.PI / 2)
 const RING_GEO = new THREE.RingGeometry(0.42, 0.56, 24).rotateX(-Math.PI / 2)
 
 const WalkableNode = memo(function WalkableNode({ id }) {
-  const { pos, kind, goal } = NODES[id]
+  const { pos, kind } = NODES[id]
   const [hovered, setHovered] = useState(false)
   const issueCommand = useGame((s) => s.issueCommand)
   // Stair nodes sit mid-flight; give them a taller hit volume so the whole flight is clickable.
@@ -268,12 +267,6 @@ const WalkableNode = memo(function WalkableNode({ id }) {
           document.body.style.cursor = ''
         }}
       />
-      {/* Subtle Monument-Valley style waypoint dot */}
-      {kind === 'tile' && (
-        <mesh geometry={MARKER_GEO} position={[0, 0.012, 0]}>
-          <meshBasicMaterial color={goal ? '#FFFFFF' : '#2F3E46'} transparent opacity={goal ? 0.9 : 0.12} />
-        </mesh>
-      )}
       {hovered && (
         <mesh geometry={RING_GEO} position={[0, 0.02, 0]}>
           <meshBasicMaterial color="#FFFFFF" transparent opacity={0.85} depthWrite={false} />
