@@ -93,14 +93,16 @@ function Parent({ variant, motion, offset }) {
 
         {/* Head + hair */}
         <Part position={[0, 0.95, 0]} size={[0.26, 0.26, 0.26]} material={SKIN} />
-        <Part position={[0, 1.1, -0.02]} size={[0.28, 0.07, 0.28]} material={hair} />
         {isDad ? (
-          // Glasses
-          <Part position={[0, 0.97, 0.135]} size={[0.24, 0.05, 0.02]} material={flatMaterial('#2F3E46')} />
+          <Part position={[0, 1.1, -0.02]} size={[0.28, 0.07, 0.28]} material={hair} />
         ) : (
+          // Bob: a crown, short fringe, and sides + back that stop at chin level
           <>
-            <Part position={[0, 1.0, -0.14]} size={[0.28, 0.2, 0.06]} material={hair} />
-            <Part position={[0, 1.12, -0.16]} size={[0.12, 0.12, 0.12]} material={hair} />
+            <Part position={[0, 1.11, -0.01]} size={[0.31, 0.08, 0.31]} material={hair} />
+            <Part position={[0, 1.05, 0.14]} size={[0.3, 0.06, 0.03]} material={hair} />
+            <Part position={[-0.145, 0.96, -0.01]} size={[0.04, 0.24, 0.29]} material={hair} />
+            <Part position={[0.145, 0.96, -0.01]} size={[0.04, 0.24, 0.29]} material={hair} />
+            <Part position={[0, 0.96, -0.145]} size={[0.31, 0.24, 0.04]} material={hair} />
           </>
         )}
       </group>
